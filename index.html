@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>どぱぷよ</title>
+    <meta name="description" content="上級者向け連鎖スコアアタック（非公式ファンメイド作品）" />
+    <meta name="theme-color" content="#0e0d1a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <main class="stage" id="stage">
+        <canvas id="board" aria-label="ゲーム盤面"></canvas>
+        <button type="button" class="undo-btn" id="undo" hidden>1手戻す<small>+5秒</small></button>
+      </main>
+
+      <aside class="hud" id="hud">
+        <div class="hud-brand">どぱぷよ</div>
+        <div class="hud-time">
+          <span class="label">TIME</span>
+          <span class="value" id="time">0:00.00</span>
+          <span class="penalty" id="penalty" hidden></span>
+        </div>
+        <div class="hud-score">
+          <span class="label">SCORE</span>
+          <span class="value" id="score">0</span>
+          <span class="target">/ <span id="target">100,000</span></span>
+          <div class="bar"><div class="bar-fill" id="bar"></div></div>
+        </div>
+        <dl class="hud-meta">
+          <div><dt>SEED</dt><dd id="seed">-</dd></div>
+          <div><dt>MAX</dt><dd id="maxchain">0連鎖</dd></div>
+          <div><dt>手数</dt><dd id="moves">0</dd></div>
+        </dl>
+        <div class="hud-keys" id="keyhelp"></div>
+      </aside>
+
+      <!-- メニュー -->
+      <section class="overlay" id="menu">
+        <div class="panel menu">
+          <h1 class="logo">どぱぷよ</h1>
+          <p class="tagline">上級者向け 連鎖スコアアタック</p>
+
+          <div class="field-group">
+            <div class="group-label">目標点</div>
+            <div class="seg" id="targets" role="radiogroup" aria-label="目標点"></div>
+          </div>
+
+          <div class="field-group">
+            <div class="group-label">シード（配ぷよ）</div>
+            <div class="seed-row">
+              <div class="seg" role="radiogroup" aria-label="シードの選び方">
+                <button type="button" class="seg-btn" id="seed-random" aria-pressed="true">ランダム</button>
+                <button type="button" class="seg-btn" id="seed-fixed" aria-pressed="false">番号指定</button>
+              </div>
+              <input id="seed-input" type="number" inputmode="numeric" min="1" max="65536" placeholder="1〜65536" disabled />
+            </div>
+          </div>
+
+          <button type="button" class="btn primary" id="start">スタート <kbd>Enter</kbd></button>
+          <div class="row">
+            <button type="button" class="btn" id="open-ranking">ランキング</button>
+            <button type="button" class="btn" id="open-options">オプション</button>
+          </div>
+
+          <div class="howto" id="howto"></div>
+          <p class="disclaimer">非公式のファンメイド作品です。株式会社セガとは関係ありません。</p>
+        </div>
+      </section>
+
+      <!-- オプション -->
+      <section class="overlay" id="options" hidden>
+        <div class="panel">
+          <h2>オプション</h2>
+          <div class="field-group">
+            <div class="group-label">キーボード操作</div>
+            <div class="seg" id="opt-scheme">
+              <button type="button" class="seg-btn" data-value="arrow">矢印キー</button>
+              <button type="button" class="seg-btn" data-value="direct">直接指定</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="group-label">次のペアの開始位置</div>
+            <div class="seg" id="opt-spawn">
+              <button type="button" class="seg-btn" data-value="reset">3列目・子が上に戻す</button>
+              <button type="button" class="seg-btn" data-value="keep">直前の位置を引き継ぐ</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="group-label" for="opt-flick">フリック判定の距離 <output id="opt-flick-out"></output></label>
+            <input id="opt-flick" type="range" min="8" max="64" step="2" />
+          </div>
+          <div class="field-group">
+            <label class="group-label" for="opt-volume">効果音 <output id="opt-volume-out"></output></label>
+            <input id="opt-volume" type="range" min="0" max="1" step="0.05" />
+          </div>
+          <div class="row">
+            <button type="button" class="btn danger" id="clear-records">記録をすべて削除</button>
+            <button type="button" class="btn primary" id="close-options">閉じる</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ランキング -->
+      <section class="overlay" id="ranking" hidden>
+        <div class="panel wide">
+          <h2>ランキング</h2>
+          <div class="seg" id="rank-tabs"></div>
+          <p class="note" id="rank-note" hidden>設定定数がデフォルトと違うため、別枠の記録を表示しています。</p>
+          <div class="table-wrap">
+            <table class="rank-table">
+              <thead>
+                <tr><th>#</th><th>タイム</th><th>シード</th><th>最大連鎖</th><th>手数</th><th>戻し</th><th>日付</th></tr>
+              </thead>
+              <tbody id="rank-body"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn primary" id="close-ranking">閉じる</button>
+        </div>
+      </section>
+
+      <!-- 結果 -->
+      <section class="overlay" id="result" hidden>
+        <div class="panel result">
+          <p class="result-kind" id="result-kind">CLEAR</p>
+          <p class="result-time" id="result-time">0:00.00</p>
+          <p class="result-delta" id="result-delta"></p>
+          <dl class="result-meta">
+            <div><dt>目標点</dt><dd id="result-target"></dd></div>
+            <div><dt>スコア</dt><dd id="result-score"></dd></div>
+            <div><dt>シード</dt><dd id="result-seed"></dd></div>
+            <div><dt>最大連鎖</dt><dd id="result-chain"></dd></div>
+            <div><dt>手数</dt><dd id="result-moves"></dd></div>
+            <div><dt>戻し</dt><dd id="result-undos"></dd></div>
+          </dl>
+          <div class="row">
+            <button type="button" class="btn primary" id="retry">リトライ <kbd>R</kbd></button>
+            <button type="button" class="btn" id="new-seed">新しいシード <kbd>N</kbd></button>
+          </div>
+          <button type="button" class="btn" id="result-undo" hidden>1手戻して続ける <kbd>Q</kbd></button>
+          <button type="button" class="btn ghost" id="to-menu">メニューへ <kbd>Esc</kbd></button>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

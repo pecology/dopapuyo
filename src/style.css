@@ -1,0 +1,652 @@
+/* 夜の宝石箱: 深い藍のベルベットに、くすんだ金の縁取り。主役は盤面の宝石 */
+:root {
+  --ink: #0e0d1a;
+  --velvet: #17152a;
+  --velvet-2: #201d38;
+  --gold: #d6be8c;
+  --gold-dim: rgba(214, 190, 140, 0.28);
+  --text: #ece8f6;
+  --muted: #9a94b8;
+  --good: #8ff0c0;
+  --bad: #ff8fa8;
+  --font-display: 'Dela Gothic One', 'Zen Kaku Gothic New', sans-serif;
+  --font-body: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+  --font-num: 'Chakra Petch', 'Consolas', monospace;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 35%, #231c3f 0%, transparent 70%),
+    var(--ink);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: 'hud' 'stage';
+  padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px)
+    max(8px, env(safe-area-inset-left, 0px));
+}
+
+.stage {
+  grid-area: stage;
+  min-height: 0;
+  position: relative;
+}
+
+#board {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  display: block;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  grid-area: hud;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-areas:
+    'time score'
+    'meta meta';
+  align-items: end;
+  gap: 4px 14px;
+  padding: 8px 4px 2px;
+}
+
+.hud-brand,
+.hud-keys {
+  display: none;
+}
+
+.label,
+.hud-meta dt {
+  display: block;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  opacity: 0.8;
+}
+
+.hud-time {
+  grid-area: time;
+}
+
+.hud-time .value {
+  display: inline-block;
+  /* 数字の幅が変わってもレイアウトが動かないよう幅を固定 */
+  min-width: 7.5ch;
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.hud-score {
+  grid-area: score;
+  min-width: 0;
+}
+
+.hud-score .value {
+  display: inline-block;
+  text-align: right;
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-score .target {
+  font-family: var(--font-num);
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  height: 4px;
+  margin-top: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #9a4de6, #2f66e8, #12b878, #f0b41e);
+  transition: width 0.12s linear;
+}
+
+.hud-meta {
+  grid-area: meta;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 0;
+}
+
+.hud-meta div {
+  min-width: 4.5em;
+}
+
+.hud-meta dd {
+  margin: 0;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
+
+/* PC: 盤面を中央に、横に情報 */
+@media (min-width: 820px) and (min-aspect-ratio: 1/1) {
+  #app {
+    grid-template-rows: 1fr;
+    grid-template-columns: minmax(200px, 280px) minmax(0, 1fr) minmax(200px, 280px);
+    grid-template-areas: '. stage hud';
+  }
+  .hud {
+    grid-template-columns: 1fr;
+    grid-template-areas: none;
+    align-content: center;
+    align-items: start;
+    gap: 22px;
+    padding: 24px 8px;
+  }
+  .hud > * {
+    grid-area: auto;
+  }
+  .hud-brand {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 28px;
+    letter-spacing: 0.04em;
+    background: linear-gradient(120deg, #ffd0e0, #c9b0ff 45%, #9fe8ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hud-time .value {
+    font-size: 44px;
+  }
+  .hud-score .value {
+    font-size: 28px;
+  }
+  .hud-meta {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .hud-meta dd {
+    font-size: 18px;
+  }
+  .hud-keys {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 0.4em;
+  margin: 0 1px;
+  border: 1px solid var(--gold-dim);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: var(--font-num);
+  font-size: 0.85em;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ---------- オーバーレイ ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+    max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: rgba(8, 7, 16, 0.72);
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.panel {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 26px 24px;
+  background: linear-gradient(180deg, var(--velvet-2), var(--velvet));
+  border: 1px solid var(--gold-dim);
+  border-radius: 14px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.panel.wide {
+  width: min(620px, 100%);
+}
+
+.panel h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  color: var(--gold);
+}
+
+.logo {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(48px, 14vw, 64px);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  background: linear-gradient(115deg, #ff9ab4 0%, #d2a6ff 30%, #8fb8ff 55%, #8af5c6 75%, #ffe08a 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 18px rgba(180, 140, 255, 0.35));
+  animation: shimmer 6s ease-in-out infinite alternate;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: 100% 0;
+  }
+}
+
+.tagline {
+  margin: -10px 0 4px;
+  text-align: center;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  font-size: 13px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+}
+
+.group-label output {
+  margin-left: 6px;
+  color: var(--text);
+  font-family: var(--font-num);
+  letter-spacing: 0;
+}
+
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seg-btn {
+  flex: 1 1 auto;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.seg-btn:hover {
+  color: var(--text);
+  border-color: var(--gold-dim);
+}
+
+.seg-btn[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--gold);
+  border-color: var(--gold);
+  font-weight: 700;
+}
+
+.seed-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seed-row .seg {
+  flex: 1 1 200px;
+}
+
+input[type='number'] {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-family: var(--font-num);
+  font-size: 16px;
+}
+
+input[type='number']:disabled {
+  opacity: 0.4;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--gold);
+}
+
+.btn {
+  padding: 11px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.08s, background 0.15s, border-color 0.15s;
+}
+
+.btn:hover {
+  border-color: var(--gold-dim);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn.primary {
+  background: linear-gradient(180deg, #e6d1a2, #c2a46a);
+  border-color: #e6d1a2;
+  color: #1a1426;
+  font-size: 17px;
+}
+
+.btn.primary kbd {
+  color: #1a1426;
+  border-color: rgba(26, 20, 38, 0.3);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.btn.danger {
+  color: var(--bad);
+}
+
+.btn.danger[data-armed='true'] {
+  background: rgba(255, 110, 140, 0.18);
+  border-color: var(--bad);
+}
+
+.btn.ghost {
+  background: none;
+  border-color: transparent;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+.row > .btn {
+  flex: 1;
+}
+
+:focus-visible {
+  outline: 2px solid #9fe8ff;
+  outline-offset: 2px;
+}
+
+.howto {
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 12px;
+}
+
+.howto b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.disclaimer {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.75;
+  text-align: center;
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bad);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.rank-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-table th {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  font-weight: 700;
+  text-align: right;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--gold-dim);
+  white-space: nowrap;
+}
+
+.rank-table td {
+  font-family: var(--font-num);
+  text-align: right;
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  white-space: nowrap;
+}
+
+.rank-table th:first-child,
+.rank-table td:first-child {
+  text-align: center;
+}
+
+.rank-table tr.top td {
+  color: #ffe28a;
+}
+
+.rank-table .empty {
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--font-body);
+  padding: 22px;
+}
+
+/* ---------- 結果 ---------- */
+.result {
+  text-align: center;
+}
+
+.result-kind {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+}
+
+.result-kind.dead {
+  color: var(--bad);
+}
+
+.result-time {
+  margin: -6px 0 0;
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-size: clamp(44px, 13vw, 64px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-delta {
+  margin: 0;
+  min-height: 1.4em;
+  font-family: var(--font-num);
+  font-size: 16px;
+}
+
+.result-delta.better {
+  color: var(--good);
+}
+
+.result-delta.worse {
+  color: var(--bad);
+}
+
+.result-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin: 0;
+  text-align: left;
+}
+
+.result-meta div {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.result-meta dt {
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+}
+
+.result-meta dd {
+  margin: 2px 0 0;
+  font-family: var(--font-num);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo {
+    animation: none;
+  }
+}
+
+/* ---------- 1手戻す ---------- */
+.penalty {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-num);
+  font-size: 12px;
+  color: var(--bad);
+  font-variant-numeric: tabular-nums;
+}
+
+.penalty.flash {
+  animation: penalty-flash 0.5s ease-out;
+}
+
+@keyframes penalty-flash {
+  from {
+    transform: scale(1.4);
+    color: #fff;
+  }
+}
+
+.undo-btn {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 4px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  background: rgba(30, 26, 54, 0.85);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.undo-btn small {
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--bad);
+}
+
+.undo-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.undo-btn:not(:disabled):active {
+  transform: translateY(1px);
+}
