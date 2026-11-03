@@ -4,7 +4,7 @@ import { sound } from './audio/sound';
 import { Field, clampPlacement, type Rotation } from './core/field';
 import { Game } from './core/game';
 import { randomSeed } from './core/tsumo';
-import { Keyboard, Pointer, type ControlHandlers } from './input/controls';
+import { Keyboard, Pointer, TwoHand, type ControlHandlers } from './input/controls';
 import { Renderer, type Cursor, type TurnAnimation } from './render/renderer';
 import {
   clearRecords,
@@ -217,6 +217,9 @@ const handlers: ControlHandlers = {
   pointerPlace(col, rot) {
     placeAt(col, rot);
   },
+  cursor() {
+    return { col: cursor.x, rot: cursor.rot };
+  },
   undo,
   retry() {
     if (mode === 'menu' || !game) return;
@@ -247,6 +250,7 @@ const pointer = new Pointer(
   (x, y) => renderer.isOutside(x, y),
   handlers,
 );
+const twoHand = new TwoHand(canvas, handlers);
 
 function goMenu(): void {
   mode = 'menu';
@@ -458,8 +462,11 @@ function renderHowto(): void {
     '<b>キーボード</b>　<kbd>←</kbd><kbd>→</kbd> 移動　<kbd>Z</kbd><kbd>X</kbd> 回転　<kbd>↓</kbd>/<kbd>↑</kbd> 設置';
   const direct =
     '<b>キーボード</b>　<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 子ぷよの向き　<kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>;</kbd><kbd>\'</kbd> その列に設置';
-  const common =
-    '<b>タッチ</b>　列をタップで縦置き、フリックで子ぷよの向き。盤面の外まで引っぱるか2本目の指でタップすると取り消し（マウスは右クリック）<br><kbd>Q</kbd> 1手戻す(+5秒)　<kbd>R</kbd> リトライ　<kbd>N</kbd> 新しいシード　<kbd>Esc</kbd> メニュー';
+  const touch =
+    options.touchScheme === 'twohand'
+      ? '<b>タッチ（両手）</b>　左半分を横にスワイプで列、右半分をフリックで子ぷよの向き。右を先に離すと設置、左を先に離すと取り消し'
+      : '<b>タッチ</b>　列をタップで縦置き、フリックで子ぷよの向き。盤面の外まで引っぱるか2本目の指でタップすると取り消し（マウスは右クリック）';
+  const common = `${touch}<br><kbd>Q</kbd> 1手戻す(+5秒)　<kbd>R</kbd> リトライ　<kbd>N</kbd> 新しいシード　<kbd>Esc</kbd> メニュー`;
   const key = options.controlScheme === 'arrow' ? arrow : direct;
   ui.howto.innerHTML = `${key}<br>${common}`;
   ui.keyhelp.innerHTML = `${key.replace('<b>キーボード</b>　', '')}<br><kbd>Q</kbd>/<kbd>BS</kbd> 1手戻す(+5秒)<br><kbd>R</kbd> リトライ　<kbd>N</kbd> 新シード<br><kbd>Esc</kbd> メニュー`;
@@ -468,6 +475,10 @@ function renderHowto(): void {
 function applyOptions(): void {
   keyboard.scheme = options.controlScheme;
   pointer.threshold = options.flickThreshold;
+  pointer.enabled = options.touchScheme === 'single';
+  twoHand.enabled = options.touchScheme === 'twohand';
+  twoHand.threshold = options.flickThreshold;
+  twoHand.columnStep = options.columnStep;
   sound.setVolume(options.sfxVolume);
   for (const b of $('opt-scheme').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
     b.setAttribute('aria-pressed', String(b.dataset.value === options.controlScheme));
@@ -475,6 +486,13 @@ function applyOptions(): void {
   for (const b of $('opt-spawn').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
     b.setAttribute('aria-pressed', String(b.dataset.value === options.spawnMode));
   }
+  for (const b of $('opt-touch').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.setAttribute('aria-pressed', String(b.dataset.value === options.touchScheme));
+  }
+  const step = $<HTMLInputElement>('opt-step');
+  step.value = String(options.columnStep);
+  $('opt-step-out').textContent = `${options.columnStep}px`;
+  $('opt-step-group').hidden = options.touchScheme !== 'twohand';
   const flick = $<HTMLInputElement>('opt-flick');
   flick.value = String(options.flickThreshold);
   $('opt-flick-out').textContent = `${options.flickThreshold}px`;
@@ -560,6 +578,16 @@ for (const b of $('opt-spawn').querySelectorAll<HTMLButtonElement>('.seg-btn')) 
     applyOptions();
   });
 }
+for (const b of $('opt-touch').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+  b.addEventListener('click', () => {
+    options = { ...options, touchScheme: b.dataset.value as Options['touchScheme'] };
+    applyOptions();
+  });
+}
+$<HTMLInputElement>('opt-step').addEventListener('input', (e) => {
+  options = { ...options, columnStep: Number((e.target as HTMLInputElement).value) };
+  applyOptions();
+});
 $<HTMLInputElement>('opt-flick').addEventListener('input', (e) => {
   options = { ...options, flickThreshold: Number((e.target as HTMLInputElement).value) };
   applyOptions();

@@ -295,7 +295,7 @@ Vitest のテスト用関数と、テストしたい関数を読み込む。`../
 151 |   it('is deterministic per seed and loops every 128 pairs', () => {
 152 |     expect(generateTsumo(123)).toEqual(generateTsumo(123));
 153 |     expect(generateTsumo(123)).not.toEqual(generateTsumo(124));
-154 |     expect(generateTsumo(1)).toHaveLength(CONFIG.TSUMO_LOOP);
+154 |     expect(generateTsumo(1)).toHaveLength(128);
 155 |   });
 156 | 
 ```
@@ -306,7 +306,7 @@ Vitest のテスト用関数と、テストしたい関数を読み込む。`../
 
 ```ts
 157 |   it('limits the first two pairs to three colors', () => {
-158 |     for (let seed = 1; seed <= 2000; seed++) {
+158 |     for (let seed = 0; seed < 2000; seed++) {
 159 |       const t = generateTsumo(seed);
 160 |       const colors = new Set([t[0].axis, t[0].child, t[1].axis, t[1].child]);
 161 |       expect(colors.size).toBeLessThanOrEqual(3);
@@ -315,80 +315,111 @@ Vitest のテスト用関数と、テストしたい関数を読み込む。`../
 164 | 
 ```
 
-最初の2手が3色以内か。シード1〜2000のすべてで確かめる。
+最初の2手が3色以内か。シード0〜1999のすべてで確かめる。
 
-**L165–177**
+**L165–172**
 
 ```ts
-165 |   it('uses every color roughly evenly after the opening', () => {
-166 |     const counts = [0, 0, 0, 0];
-167 |     for (let seed = 1; seed <= 500; seed++) {
-168 |       for (const p of generateTsumo(seed).slice(2)) {
-169 |         counts[p.axis]++;
-170 |         counts[p.child]++;
-171 |       }
-172 |     }
-173 |     const total = counts.reduce((a, b) => a + b, 0);
-174 |     for (const c of counts) expect(Math.abs(c / total - 0.25)).toBeLessThan(0.01);
-175 |   });
-176 | });
-177 | 
+165 |   it('shares the opening between color counts', () => {
+166 |     for (let seed = 0; seed < 200; seed++) {
+167 |       const three = generateTsumo(seed, 3).slice(0, 2);
+168 |       expect(generateTsumo(seed, 4).slice(0, 2)).toEqual(three);
+169 |       expect(generateTsumo(seed, 5).slice(0, 2)).toEqual(three);
+170 |     }
+171 |   });
+172 | 
 ```
 
-3手目以降の色の偏り。シード500個ぶんの色を数え、各色の割合が25%から1%以内に収まっているか。乱数の作り方に問題があれば、ここで偏りが見つかる。
+最初の2手は、3色・4色・5色のどれで遊んでも同じになるか。ぷよぷよeスポーツの方式では、4色・5色の表の先頭4個を3色の表で上書きするので、こうなるはず。
+
+**L173–187**
+
+```ts
+173 |   it('deals each color 64 times per loop apart from the opening', () => {
+174 |     for (let seed = 0; seed < 200; seed++) {
+175 |       const t = generateTsumo(seed, 4);
+176 |       const counts = new Map<number, number>();
+177 |       for (const p of t.slice(2)) {
+178 |         counts.set(p.axis, (counts.get(p.axis) ?? 0) + 1);
+179 |         counts.set(p.child, (counts.get(p.child) ?? 0) + 1);
+180 |       }
+181 |       // 4色の表は各色64個。先頭4個を3色の表で上書きするので、残り252個の内訳は各色60〜64個
+182 |       expect(counts.size).toBe(4);
+183 |       for (const c of counts.values()) expect(c).toBeGreaterThanOrEqual(60);
+184 |       for (const c of counts.values()) expect(c).toBeLessThanOrEqual(64);
+185 |     }
+186 |   });
+187 | 
+```
+
+1ループ（128手）の中の色の数。4色の表は 0,1,2,3 を64個ずつ並べてから入れ替えるので、どのシードでも各色ほぼ同じ数になる（旧方式は1個ずつ独立に乱数で決めていたため、ループの中で色が偏ることがあった）。
+先頭4個は3色の表で上書きされるので、そこを除いた残り252個で、4色すべてが出ていて、各色が60〜64個に収まっているかを確かめる。
+`new Map()` は「キー → 値」の対応表。ここでは「色 → 出た数」。
+
+**L188–192**
+
+```ts
+188 |   it('treats seed 65536 as seed 0', () => {
+189 |     expect(generateTsumo(65536)).toEqual(generateTsumo(0));
+190 |   });
+191 | });
+192 | 
+```
+
+シード番号は 1〜65536 で選ぶが、生成には下16bit を使う。65536 は 0 と同じ配ぷよになるか。
 
 ## 1手戻す
 
-**L178–198**
+**L193–213**
 
 ```ts
-178 | describe('undo', () => {
-179 |   it('restores the field, score and tsumo position', () => {
-180 |     const game = new Game(77, 1_000_000);
-181 |     const first = game.current();
-182 |     game.place(0, 0);
-183 |     game.place(1, 1);
-184 |     const snapshot = game.field.cols.map((c) => [...c]);
-185 |     const score = game.score;
-186 |     game.place(3, 2);
-187 |     expect(game.undo()).toEqual({ x: 3, rot: 2 });
-188 |     expect(game.field.cols).toEqual(snapshot);
-189 |     expect(game.score).toBe(score);
-190 |     expect(game.moves).toBe(2);
-191 |     game.undo();
-192 |     game.undo();
-193 |     expect(game.moves).toBe(0);
-194 |     expect(game.current()).toEqual(first);
-195 |     expect(game.undo()).toBeNull();
-196 |     expect(game.undos).toBe(3);
-197 |   });
-198 | 
+193 | describe('undo', () => {
+194 |   it('restores the field, score and tsumo position', () => {
+195 |     const game = new Game(77, 1_000_000);
+196 |     const first = game.current();
+197 |     game.place(0, 0);
+198 |     game.place(1, 1);
+199 |     const snapshot = game.field.cols.map((c) => [...c]);
+200 |     const score = game.score;
+201 |     game.place(3, 2);
+202 |     expect(game.undo()).toEqual({ x: 3, rot: 2 });
+203 |     expect(game.field.cols).toEqual(snapshot);
+204 |     expect(game.score).toBe(score);
+205 |     expect(game.moves).toBe(2);
+206 |     game.undo();
+207 |     game.undo();
+208 |     expect(game.moves).toBe(0);
+209 |     expect(game.current()).toEqual(first);
+210 |     expect(game.undo()).toBeNull();
+211 |     expect(game.undos).toBe(3);
+212 |   });
+213 | 
 ```
 
 3手置いてから戻すと、盤面・スコア・手数が2手目の後に戻り、返ってくる位置と向きが3手目のものか。さらに2回戻すと最初の状態に戻って最初のペアがまた来ること、それ以上は戻せない（`null`）こと、戻した回数が3回と数えられていること。
 
-**L199–217**
+**L214–232**
 
 ```ts
-199 |   it('can undo out of a death but not out of a clear', () => {
-200 |     const dead = new Game(1, 1_000_000);
-201 |     dead.field.cols[2] = Array(10).fill(0).map((_, i) => i % 2);
-202 |     dead.current = () => ({ axis: 2, child: 3 });
-203 |     dead.place(2, 0);
-204 |     expect(dead.finished).toBe('dead');
-205 |     expect(dead.canUndo()).toBe(true);
-206 |     dead.undo();
-207 |     expect(dead.finished).toBeNull();
-208 |     expect(dead.field.height(2)).toBe(10);
-209 | 
-210 |     const clear = new Game(1, 40);
-211 |     clear.field.cols[0] = [5, 5, 5];
-212 |     clear.current = () => ({ axis: 5, child: 6 });
-213 |     clear.place(0, 0);
-214 |     expect(clear.finished).toBe('cleared');
-215 |     expect(clear.canUndo()).toBe(false);
-216 |   });
-217 | });
+214 |   it('can undo out of a death but not out of a clear', () => {
+215 |     const dead = new Game(1, 1_000_000);
+216 |     dead.field.cols[2] = Array(10).fill(0).map((_, i) => i % 2);
+217 |     dead.current = () => ({ axis: 2, child: 3 });
+218 |     dead.place(2, 0);
+219 |     expect(dead.finished).toBe('dead');
+220 |     expect(dead.canUndo()).toBe(true);
+221 |     dead.undo();
+222 |     expect(dead.finished).toBeNull();
+223 |     expect(dead.field.height(2)).toBe(10);
+224 | 
+225 |     const clear = new Game(1, 40);
+226 |     clear.field.cols[0] = [5, 5, 5];
+227 |     clear.current = () => ({ axis: 5, child: 6 });
+228 |     clear.place(0, 0);
+229 |     expect(clear.finished).toBe('cleared');
+230 |     expect(clear.canUndo()).toBe(false);
+231 |   });
+232 | });
 ```
 
 窒息からは戻せて、戻すと終了状態が解除され盤面が置く前の高さに戻ること。クリアからは戻せないこと。

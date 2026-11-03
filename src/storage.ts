@@ -2,12 +2,17 @@ import { configSignature } from './config';
 
 export type ControlScheme = 'arrow' | 'direct';
 export type SpawnMode = 'reset' | 'keep';
+/** タッチ操作: 片手（タップ列＋フリック）／両手（左で列・右で向き） */
+export type TouchScheme = 'single' | 'twohand';
 
 export interface Options {
   controlScheme: ControlScheme;
   spawnMode: SpawnMode;
+  touchScheme: TouchScheme;
   /** フリック判定のしきい値（px） */
   flickThreshold: number;
+  /** 両手モードで1列動かすのに必要なスワイプ距離（px） */
+  columnStep: number;
   /** 効果音の音量 0〜1 */
   sfxVolume: number;
 }
@@ -24,13 +29,16 @@ export interface RunRecord {
 }
 
 const OPTIONS_KEY = 'dopapuyo.options.v1';
-const RECORDS_KEY = 'dopapuyo.records.v1';
+// v2: 配ぷよをぷよぷよeスポーツ方式に変えたので、v1 の記録とは分けて保存する
+const RECORDS_KEY = 'dopapuyo.records.v2';
 const RANK_LIMIT = 10;
 
 export const DEFAULT_OPTIONS: Options = {
   controlScheme: 'arrow',
   spawnMode: 'reset',
+  touchScheme: 'single',
   flickThreshold: 24,
+  columnStep: 32,
   sfxVolume: 0.7,
 };
 

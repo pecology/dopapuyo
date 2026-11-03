@@ -53,7 +53,7 @@
 
 これらの合計が「1手あたりの待ち時間」になり、タイムに含まれる（`core/game.ts` の `buildTimeline` で計算）。
 
-**L18–33**
+**L18–29**
 
 ```ts
 18 | 
@@ -64,45 +64,40 @@
 23 |   ALL_CLEAR_BONUS: 2100,
 24 |   /** シード数（1〜SEED_COUNT） */
 25 |   SEED_COUNT: 65536,
-26 |   /** ツモのループ手数 */
-27 |   TSUMO_LOOP: 128,
-28 |   /** 最初の2手の色数上限 */
-29 |   OPENING_COLOR_LIMIT: 3,
-30 |   /** ネクスト表示数 */
-31 |   NEXT_COUNT: 2,
-32 |   /** 目標点の一覧 */
-33 |   TARGETS: [100_000, 300_000, 500_000, 1_000_000, 10_000_000] as number[],
+26 |   /** ネクスト表示数 */
+27 |   NEXT_COUNT: 2,
+28 |   /** 目標点の一覧 */
+29 |   TARGETS: [100_000, 300_000, 500_000, 1_000_000, 10_000_000] as number[],
 ```
 
 ゲームルールに関わる値。
 - `COLOR_COUNT: 4` … ぷよの色数。
 - `ALL_CLEAR_BONUS: 2100` … 全消しした次の連鎖に足す点数。
 - `SEED_COUNT: 65536` … 配ぷよのパターン数。シード番号は 1〜65536。
-- `TSUMO_LOOP: 128` … 128手で配ぷよが一周する。
-- `OPENING_COLOR_LIMIT: 3` … 最初の2手は3色以内。
+  128手で一周すること・最初の2手が3色以内になることは、ぷよぷよeスポーツの生成方式そのものの性質なので定数にはしていない（`core/tsumo.ts` 参照）。
 - `NEXT_COUNT: 2` … ネクストを2手先まで表示。
 - `TARGETS` … メニューに並ぶ目標点。`100_000` の `_` は数字を読みやすくする区切りで、`100000` と同じ意味。末尾の `as number[]` は「数値の配列として扱う」という型の指定（下の `as const` で中身が読み取り専用の固定値として扱われるのを、ここだけ普通の配列に戻している）。
 
-**L34–39**
+**L30–35**
 
 ```ts
-34 | 
-35 |   // ---- 操作 ----
-36 |   /** 矢印キー長押しで連続移動が始まるまでの時間 */
-37 |   DAS_MS: 110,
-38 |   /** 連続移動の間隔（0で壁まで瞬間移動） */
-39 |   ARR_MS: 25,
+30 | 
+31 |   // ---- 操作 ----
+32 |   /** 矢印キー長押しで連続移動が始まるまでの時間 */
+33 |   DAS_MS: 110,
+34 |   /** 連続移動の間隔（0で壁まで瞬間移動） */
+35 |   ARR_MS: 25,
 ```
 
 キーボード長押しの挙動。
 - `DAS_MS: 110` … ←→を押しっぱなしにしたとき、連続移動が始まるまでの待ち時間（DAS = Delayed Auto Shift、落ち物ゲームの用語）。
 - `ARR_MS: 25` … 連続移動が始まった後、1列動くごとの間隔（ARR = Auto Repeat Rate）。0にすると壁まで一瞬で移動する。
 
-**L40–41**
+**L36–37**
 
 ```ts
-40 | } as const;
-41 | 
+36 | } as const;
+37 | 
 ```
 
 `} as const;` でオブジェクトを閉じる。`as const` は TypeScript の機能で、「この値は書き換えない定数」として扱わせる。
@@ -110,69 +105,67 @@
 
 ## ランキング用の「設定の署名」
 
-**L42–54**
+**L38–48**
 
 ```ts
-42 | /** ランキングの公平性に関わる定数だけを取り出した署名 */
-43 | const FAIRNESS_KEYS = [
-44 |   'CHAIN_POP_MS',
-45 |   'CHAIN_FALL_MS_PER_ROW',
-46 |   'CHAIN_GAP_MS',
-47 |   'PLACE_FALL_MS_PER_ROW',
-48 |   'UNDO_PENALTY_MS',
-49 |   'COLOR_COUNT',
-50 |   'ALL_CLEAR_BONUS',
-51 |   'SEED_COUNT',
-52 |   'TSUMO_LOOP',
-53 |   'OPENING_COLOR_LIMIT',
-54 | ] as const;
+38 | /** ランキングの公平性に関わる定数だけを取り出した署名 */
+39 | const FAIRNESS_KEYS = [
+40 |   'CHAIN_POP_MS',
+41 |   'CHAIN_FALL_MS_PER_ROW',
+42 |   'CHAIN_GAP_MS',
+43 |   'PLACE_FALL_MS_PER_ROW',
+44 |   'UNDO_PENALTY_MS',
+45 |   'COLOR_COUNT',
+46 |   'ALL_CLEAR_BONUS',
+47 |   'SEED_COUNT',
+48 | ] as const;
 ```
 
 `FAIRNESS_KEYS` は「この値が変わるとタイムの比較が不公平になる」設定項目の名前の一覧。
 たとえば落下を遅くすればタイムは悪くなるし、色数を減らせば簡単になる。こういう値を変えたときはランキングを別枠にしたいので、どの項目を見るかをここで決めている。
 DAS/ARR や目標点の一覧はタイムの公平性に関係しないので入れていない。
 
-**L55–56**
+**L49–50**
 
 ```ts
-55 | 
-56 | const DEFAULT_SIGNATURE = '150|8|30|5|5000|4|2100|65536|128|3';
+49 | 
+50 | const DEFAULT_SIGNATURE = '150|8|30|5|5000|4|2100|65536';
 ```
 
 デフォルト設定のときに下の関数が作る文字列を、あらかじめ書いておいたもの。
 `FAIRNESS_KEYS` の順番どおりに値を `|` でつないだ形になっている。**CONFIG の初期値を変えたら、ここも合わせて書き換える必要がある**（書き換えないと、デフォルト設定でも「変更あり」として別枠扱いになる）。
 
-**L57–62**
+**L51–56**
 
 ```ts
-57 | 
-58 | /** デフォルト設定なら 'default'、変更されていればその内容を表す文字列 */
-59 | export function configSignature(): string {
-60 |   const sig = FAIRNESS_KEYS.map((k) => String(CONFIG[k])).join('|');
-61 |   return sig === DEFAULT_SIGNATURE ? 'default' : sig;
-62 | }
+51 | 
+52 | /** デフォルト設定なら 'default'、変更されていればその内容を表す文字列 */
+53 | export function configSignature(): string {
+54 |   const sig = FAIRNESS_KEYS.map((k) => String(CONFIG[k])).join('|');
+55 |   return sig === DEFAULT_SIGNATURE ? 'default' : sig;
+56 | }
 ```
 
 `configSignature()` 関数。
-- L60: `FAIRNESS_KEYS.map((k) => String(CONFIG[k]))` で、各項目の値を文字列にした配列を作る。`.join('|')` でそれを `|` でつないで1本の文字列にする。
-- L61: それがデフォルトと同じなら `'default'` を、違えばその文字列自体を返す。三項演算子 `条件 ? A : B` は「条件が真ならA、偽ならB」。
+- L54: `FAIRNESS_KEYS.map((k) => String(CONFIG[k]))` で、各項目の値を文字列にした配列を作る。`.join('|')` でそれを `|` でつないで1本の文字列にする。
+- L55: それがデフォルトと同じなら `'default'` を、違えばその文字列自体を返す。三項演算子 `条件 ? A : B` は「条件が真ならA、偽ならB」。
 
 `storage.ts` がランキングを保存するときに、この戻り値を保存キーの一部に使う。
 
 ## 盤面の寸法
 
-**L63–71**
+**L57–65**
 
 ```ts
-63 | 
-64 | // ---- フィールド寸法（ルール準拠のため固定）----
-65 | export const COLS = 6;
-66 | /** 表示される段数 */
-67 | export const VISIBLE_ROWS = 12;
-68 | /** 保持できる段数（13段目まで）。14段目に入ったぷよは消滅 */
-69 | export const STORED_ROWS = 13;
-70 | /** 窒息判定の列（0始まりで3列目） */
-71 | export const DEATH_COL = 2;
+57 | 
+58 | // ---- フィールド寸法（ルール準拠のため固定）----
+59 | export const COLS = 6;
+60 | /** 表示される段数 */
+61 | export const VISIBLE_ROWS = 12;
+62 | /** 保持できる段数（13段目まで）。14段目に入ったぷよは消滅 */
+63 | export const STORED_ROWS = 13;
+64 | /** 窒息判定の列（0始まりで3列目） */
+65 | export const DEATH_COL = 2;
 ```
 
 ルールで決まっていて変えない値なので、`CONFIG` とは別に1つずつ `export const` している。

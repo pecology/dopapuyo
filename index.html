@@ -93,6 +93,17 @@
             </div>
           </div>
           <div class="field-group">
+            <div class="group-label">タッチ操作</div>
+            <div class="seg" id="opt-touch">
+              <button type="button" class="seg-btn" data-value="single">片手（タップ＋フリック）</button>
+              <button type="button" class="seg-btn" data-value="twohand">両手（左で列・右で向き）</button>
+            </div>
+          </div>
+          <div class="field-group" id="opt-step-group">
+            <label class="group-label" for="opt-step">両手モードで1列動かす距離 <output id="opt-step-out"></output></label>
+            <input id="opt-step" type="range" min="12" max="80" step="2" />
+          </div>
+          <div class="field-group">
             <label class="group-label" for="opt-flick">フリック判定の距離 <output id="opt-flick-out"></output></label>
             <input id="opt-flick" type="range" min="8" max="64" step="2" />
           </div>

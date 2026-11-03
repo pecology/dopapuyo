@@ -165,7 +165,7 @@ Google Fonts からフォントを読み込む。
 
 ## オプション画面
 
-**L77–109**
+**L77–120**
 
 ```html
  77 |       <!-- オプション -->
@@ -187,99 +187,111 @@ Google Fonts からフォントを読み込む。
  93 |             </div>
  94 |           </div>
  95 |           <div class="field-group">
- 96 |             <label class="group-label" for="opt-flick">フリック判定の距離 <output id="opt-flick-out"></output></label>
- 97 |             <input id="opt-flick" type="range" min="8" max="64" step="2" />
- 98 |           </div>
- 99 |           <div class="field-group">
-100 |             <label class="group-label" for="opt-volume">効果音 <output id="opt-volume-out"></output></label>
-101 |             <input id="opt-volume" type="range" min="0" max="1" step="0.05" />
-102 |           </div>
-103 |           <div class="row">
-104 |             <button type="button" class="btn danger" id="clear-records">記録をすべて削除</button>
-105 |             <button type="button" class="btn primary" id="close-options">閉じる</button>
-106 |           </div>
-107 |         </div>
-108 |       </section>
-109 | 
+ 96 |             <div class="group-label">タッチ操作</div>
+ 97 |             <div class="seg" id="opt-touch">
+ 98 |               <button type="button" class="seg-btn" data-value="single">片手（タップ＋フリック）</button>
+ 99 |               <button type="button" class="seg-btn" data-value="twohand">両手（左で列・右で向き）</button>
+100 |             </div>
+101 |           </div>
+102 |           <div class="field-group" id="opt-step-group">
+103 |             <label class="group-label" for="opt-step">両手モードで1列動かす距離 <output id="opt-step-out"></output></label>
+104 |             <input id="opt-step" type="range" min="12" max="80" step="2" />
+105 |           </div>
+106 |           <div class="field-group">
+107 |             <label class="group-label" for="opt-flick">フリック判定の距離 <output id="opt-flick-out"></output></label>
+108 |             <input id="opt-flick" type="range" min="8" max="64" step="2" />
+109 |           </div>
+110 |           <div class="field-group">
+111 |             <label class="group-label" for="opt-volume">効果音 <output id="opt-volume-out"></output></label>
+112 |             <input id="opt-volume" type="range" min="0" max="1" step="0.05" />
+113 |           </div>
+114 |           <div class="row">
+115 |             <button type="button" class="btn danger" id="clear-records">記録をすべて削除</button>
+116 |             <button type="button" class="btn primary" id="close-options">閉じる</button>
+117 |           </div>
+118 |         </div>
+119 |       </section>
+120 | 
 ```
 
 最初は `hidden`。
-- L83–86, L90–93: 選択式のボタン。`data-value` 属性に設定値を書いておき、`main.ts` が `dataset.value` で読む。
-- L96–97: フリック判定の距離のスライダー（`type="range"`）。`label` の `for="opt-flick"` で、文字を押してもスライダーが操作対象になる。`output` は計算結果などを表示する要素で、今の値（`24px` など）を出す。
-- L100–101: 効果音の音量スライダー。0〜1 を 0.05 刻み。
-- L103–106: 記録削除と閉じるボタン。
+- L83–86, L90–93, L97–100: 選択式のボタン（キーボード操作・次のペアの開始位置・タッチ操作）。`data-value` 属性に設定値を書いておき、`main.ts` が `dataset.value` で読む。
+- L102–105: 両手モードで1列動かす距離のスライダー（`id="opt-step-group"` の囲みごと）。両手モードのときだけ表示する。
+- L107–108: フリック判定の距離のスライダー（`type="range"`）。`label` の `for="opt-flick"` で、文字を押してもスライダーが操作対象になる。`output` は計算結果などを表示する要素で、今の値（`24px` など）を出す。
+- L111–112: 効果音の音量スライダー。0〜1 を 0.05 刻み。
+- L114–117: 記録削除と閉じるボタン。
 
 ## ランキング画面
 
-**L110–127**
+**L121–138**
 
 ```html
-110 |       <!-- ランキング -->
-111 |       <section class="overlay" id="ranking" hidden>
-112 |         <div class="panel wide">
-113 |           <h2>ランキング</h2>
-114 |           <div class="seg" id="rank-tabs"></div>
-115 |           <p class="note" id="rank-note" hidden>設定定数がデフォルトと違うため、別枠の記録を表示しています。</p>
-116 |           <div class="table-wrap">
-117 |             <table class="rank-table">
-118 |               <thead>
-119 |                 <tr><th>#</th><th>タイム</th><th>シード</th><th>最大連鎖</th><th>手数</th><th>戻し</th><th>日付</th></tr>
-120 |               </thead>
-121 |               <tbody id="rank-body"></tbody>
-122 |             </table>
-123 |           </div>
-124 |           <button type="button" class="btn primary" id="close-ranking">閉じる</button>
-125 |         </div>
-126 |       </section>
-127 | 
+121 |       <!-- ランキング -->
+122 |       <section class="overlay" id="ranking" hidden>
+123 |         <div class="panel wide">
+124 |           <h2>ランキング</h2>
+125 |           <div class="seg" id="rank-tabs"></div>
+126 |           <p class="note" id="rank-note" hidden>設定定数がデフォルトと違うため、別枠の記録を表示しています。</p>
+127 |           <div class="table-wrap">
+128 |             <table class="rank-table">
+129 |               <thead>
+130 |                 <tr><th>#</th><th>タイム</th><th>シード</th><th>最大連鎖</th><th>手数</th><th>戻し</th><th>日付</th></tr>
+131 |               </thead>
+132 |               <tbody id="rank-body"></tbody>
+133 |             </table>
+134 |           </div>
+135 |           <button type="button" class="btn primary" id="close-ranking">閉じる</button>
+136 |         </div>
+137 |       </section>
+138 | 
 ```
 
-- L114: 目標点ごとのタブ（`main.ts` が作る）。
-- L115: 設定定数を変えているときの注意書き。
-- L116–123: 記録の表。`thead` が見出し行、`tbody` が中身（`main.ts` が行を作って入れる）。`table-wrap` で包むのは、スマホで表が横にはみ出したときにその部分だけ横スクロールさせるため。
+- L125: 目標点ごとのタブ（`main.ts` が作る）。
+- L126: 設定定数を変えているときの注意書き。
+- L127–134: 記録の表。`thead` が見出し行、`tbody` が中身（`main.ts` が行を作って入れる）。`table-wrap` で包むのは、スマホで表が横にはみ出したときにその部分だけ横スクロールさせるため。
 
 ## 結果画面
 
-**L128–150**
+**L139–161**
 
 ```html
-128 |       <!-- 結果 -->
-129 |       <section class="overlay" id="result" hidden>
-130 |         <div class="panel result">
-131 |           <p class="result-kind" id="result-kind">CLEAR</p>
-132 |           <p class="result-time" id="result-time">0:00.00</p>
-133 |           <p class="result-delta" id="result-delta"></p>
-134 |           <dl class="result-meta">
-135 |             <div><dt>目標点</dt><dd id="result-target"></dd></div>
-136 |             <div><dt>スコア</dt><dd id="result-score"></dd></div>
-137 |             <div><dt>シード</dt><dd id="result-seed"></dd></div>
-138 |             <div><dt>最大連鎖</dt><dd id="result-chain"></dd></div>
-139 |             <div><dt>手数</dt><dd id="result-moves"></dd></div>
-140 |             <div><dt>戻し</dt><dd id="result-undos"></dd></div>
-141 |           </dl>
-142 |           <div class="row">
-143 |             <button type="button" class="btn primary" id="retry">リトライ <kbd>R</kbd></button>
-144 |             <button type="button" class="btn" id="new-seed">新しいシード <kbd>N</kbd></button>
-145 |           </div>
-146 |           <button type="button" class="btn" id="result-undo" hidden>1手戻して続ける <kbd>Q</kbd></button>
-147 |           <button type="button" class="btn ghost" id="to-menu">メニューへ <kbd>Esc</kbd></button>
-148 |         </div>
-149 |       </section>
-150 |     </div>
+139 |       <!-- 結果 -->
+140 |       <section class="overlay" id="result" hidden>
+141 |         <div class="panel result">
+142 |           <p class="result-kind" id="result-kind">CLEAR</p>
+143 |           <p class="result-time" id="result-time">0:00.00</p>
+144 |           <p class="result-delta" id="result-delta"></p>
+145 |           <dl class="result-meta">
+146 |             <div><dt>目標点</dt><dd id="result-target"></dd></div>
+147 |             <div><dt>スコア</dt><dd id="result-score"></dd></div>
+148 |             <div><dt>シード</dt><dd id="result-seed"></dd></div>
+149 |             <div><dt>最大連鎖</dt><dd id="result-chain"></dd></div>
+150 |             <div><dt>手数</dt><dd id="result-moves"></dd></div>
+151 |             <div><dt>戻し</dt><dd id="result-undos"></dd></div>
+152 |           </dl>
+153 |           <div class="row">
+154 |             <button type="button" class="btn primary" id="retry">リトライ <kbd>R</kbd></button>
+155 |             <button type="button" class="btn" id="new-seed">新しいシード <kbd>N</kbd></button>
+156 |           </div>
+157 |           <button type="button" class="btn" id="result-undo" hidden>1手戻して続ける <kbd>Q</kbd></button>
+158 |           <button type="button" class="btn ghost" id="to-menu">メニューへ <kbd>Esc</kbd></button>
+159 |         </div>
+160 |       </section>
+161 |     </div>
 ```
 
-- L131–133: 見出し（CLEAR / NEW RECORD / 窒息）、タイム、ベストとの差。
-- L134–141: 詳細の数値。
-- L142–147: リトライ、新しいシード、1手戻して続ける（窒息時だけ表示）、メニューへ。
-- L150: アプリ全体の箱の終わり。
+- L142–144: 見出し（CLEAR / NEW RECORD / 窒息）、タイム、ベストとの差。
+- L145–152: 詳細の数値。
+- L153–158: リトライ、新しいシード、1手戻して続ける（窒息時だけ表示）、メニューへ。
+- L161: アプリ全体の箱の終わり。
 
-**L151–153**
+**L162–164**
 
 ```html
-151 |     <script type="module" src="./src/main.ts"></script>
-152 |   </body>
-153 | </html>
+162 |     <script type="module" src="./src/main.ts"></script>
+163 |   </body>
+164 | </html>
 ```
 
-- L151: プログラムを読み込む。`type="module"` は、`import` / `export` を使った書き方（ESモジュール）のファイルだという指定。開発中は Vite が `main.ts` をその場でブラウザが読める形に変換し、`npm run build` では全部を1つの JavaScript ファイルにまとめて、この行をそのファイルへの参照に書き換える。
-- L152–153: ページの終わり。
+- L162: プログラムを読み込む。`type="module"` は、`import` / `export` を使った書き方（ESモジュール）のファイルだという指定。開発中は Vite が `main.ts` をその場でブラウザが読める形に変換し、`npm run build` では全部を1つの JavaScript ファイルにまとめて、この行をそのファイルへの参照に書き換える。
+- L163–164: ページの終わり。

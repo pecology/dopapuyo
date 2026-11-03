@@ -18,6 +18,8 @@ export interface ControlHandlers {
   /** タッチ/マウスの操作が取り消された */
   cancelled(): void;
   pointerPlace(col: number, rot: Rotation): void;
+  /** 今の操作位置（列と向き） */
+  cursor(): { col: number; rot: Rotation };
   /** 1手戻す（ペナルティ付き） */
   undo(): void;
   retry(): void;
@@ -149,6 +151,7 @@ export class Keyboard {
  * 取り消し: 盤面の外まで引っぱって離す／2本目の指でタップ／右クリック。
  */
 export class Pointer {
+  enabled = true;
   threshold = 24;
   private active: { id: number; x0: number; y0: number; col: number; rot: Rotation; outside: boolean } | null = null;
   /** キャンセルに使った指（離したときに何もしないよう覚えておく） */
@@ -172,7 +175,7 @@ export class Pointer {
         this.cancel();
         return;
       }
-      if (e.button === 2) return;
+      if (!this.enabled || e.button === 2) return;
       if (!this.h.canControl()) return;
       const col = this.columnAt(e.clientX, e.clientY);
       if (col === null) return;
@@ -216,8 +219,103 @@ export class Pointer {
   }
 
   private rotationFor(dx: number, dy: number): Rotation {
-    if (Math.hypot(dx, dy) < this.threshold) return 0;
-    if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 1 : 3;
-    return dy > 0 ? 2 : 0;
+    return flickRotation(dx, dy, this.threshold) ?? 0;
+  }
+}
+
+/** フリック方向から子ぷよの向きを求める。しきい値に届かなければ null */
+function flickRotation(dx: number, dy: number, threshold: number): Rotation | null {
+  if (Math.hypot(dx, dy) < threshold) return null;
+  if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 1 : 3;
+  return dy > 0 ? 2 : 0;
+}
+
+/**
+ * 両手モード（タッチ）: 画面の左半分で列、右半分で子ぷよの向きを決める。
+ * - 左の指: 横にスワイプした距離で列を動かす（columnStep px で1列）
+ * - 右の指: フリック方向＝子ぷよの向き。フリックしなければ指を置いたときの向きのまま
+ * - 右を先に離すと設置、左を先に離すとキャンセル。右だけで操作したときは今の列に置く
+ */
+export class TwoHand {
+  enabled = false;
+  threshold = 24;
+  columnStep = 32;
+  private left: { id: number; x0: number; col0: number; col: number } | null = null;
+  private right: { id: number; x0: number; y0: number; rot0: Rotation; rot: Rotation } | null = null;
+  /** 設置・キャンセル後もまだ触れている指（離したときに何もしないよう覚えておく） */
+  private ignored = new Set<number>();
+
+  constructor(
+    private canvas: HTMLCanvasElement,
+    private h: ControlHandlers,
+  ) {
+    canvas.addEventListener('pointerdown', (e) => this.onDown(e));
+    canvas.addEventListener('pointermove', (e) => this.onMove(e));
+    canvas.addEventListener('pointerup', (e) => this.onUp(e, true));
+    canvas.addEventListener('pointercancel', (e) => this.onUp(e, false));
+  }
+
+  private onDown(e: PointerEvent): void {
+    if (!this.enabled || e.button === 2) return;
+    e.preventDefault();
+    const rect = this.canvas.getBoundingClientRect();
+    const isLeft = e.clientX < rect.left + rect.width / 2;
+    // 同じ側に2本目の指が来た・操作できない間に触れた指は無視する
+    if ((isLeft ? this.left : this.right) || !this.h.canControl()) {
+      this.ignored.add(e.pointerId);
+      return;
+    }
+    this.canvas.setPointerCapture(e.pointerId);
+    const cur = this.h.cursor();
+    if (isLeft) this.left = { id: e.pointerId, x0: e.clientX, col0: cur.col, col: cur.col };
+    else this.right = { id: e.pointerId, x0: e.clientX, y0: e.clientY, rot0: cur.rot, rot: cur.rot };
+    this.show();
+  }
+
+  private onMove(e: PointerEvent): void {
+    const l = this.left;
+    const r = this.right;
+    if (l && l.id === e.pointerId) {
+      const col = l.col0 + Math.round((e.clientX - l.x0) / this.columnStep);
+      l.col = Math.min(COLS - 1, Math.max(0, col));
+    } else if (r && r.id === e.pointerId) {
+      r.rot = flickRotation(e.clientX - r.x0, e.clientY - r.y0, this.threshold) ?? r.rot0;
+    } else {
+      return;
+    }
+    this.show();
+  }
+
+  private onUp(e: PointerEvent, commit: boolean): void {
+    if (this.ignored.delete(e.pointerId)) return;
+    const l = this.left;
+    const r = this.right;
+    if (r && r.id === e.pointerId) {
+      const { col, rot } = this.state();
+      this.release(e.pointerId);
+      if (commit && this.h.canControl()) this.h.pointerPlace(col, rot);
+    } else if (l && l.id === e.pointerId) {
+      // 左を先に離した＝キャンセル。列は指を置く前に戻す
+      this.h.preview(l.col0, r ? r.rot0 : this.h.cursor().rot, false);
+      this.release(e.pointerId);
+      if (r) this.h.cancelled();
+    }
+  }
+
+  /** 操作を終える。離した指以外でまだ触れている指は、離すまで無視する */
+  private release(liftedId: number): void {
+    for (const f of [this.left, this.right]) if (f && f.id !== liftedId) this.ignored.add(f.id);
+    this.left = null;
+    this.right = null;
+  }
+
+  private state(): { col: number; rot: Rotation } {
+    const cur = this.h.cursor();
+    return { col: this.left ? this.left.col : cur.col, rot: this.right ? this.right.rot : cur.rot };
+  }
+
+  private show(): void {
+    const { col, rot } = this.state();
+    this.h.preview(col, rot, false);
   }
 }

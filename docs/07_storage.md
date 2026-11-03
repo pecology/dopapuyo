@@ -12,155 +12,166 @@ localStorage はブラウザがサイトごとに用意してくれる小さな�
 
 ランキングを設定ごとに分けるため、設定の署名を作る関数を読み込む。
 
-**L3–5**
+**L3–7**
 
 ```ts
   3 | export type ControlScheme = 'arrow' | 'direct';
   4 | export type SpawnMode = 'reset' | 'keep';
-  5 | 
+  5 | /** タッチ操作: 片手（タップ列＋フリック）／両手（左で列・右で向き） */
+  6 | export type TouchScheme = 'single' | 'twohand';
+  7 | 
 ```
 
 - `ControlScheme` … キーボード操作の方式。`'arrow'`（矢印キー）か `'direct'`（直接指定）。
 - `SpawnMode` … 置いた後の次ペアの開始位置。`'reset'`（3列目・子が上に戻す）か `'keep'`（引き継ぐ）。
+- `TouchScheme` … タッチ操作の方式。`'single'`（片手: タップした列＋フリック）か `'twohand'`（両手: 左半分で列・右半分で向き）。
 
 文字列リテラルのユニオン型にしておくと、`'arow'` のような打ち間違いを TypeScript が見つけてくれる。
 
-**L6–14**
+**L8–19**
 
 ```ts
-  6 | export interface Options {
-  7 |   controlScheme: ControlScheme;
-  8 |   spawnMode: SpawnMode;
-  9 |   /** フリック判定のしきい値（px） */
- 10 |   flickThreshold: number;
- 11 |   /** 効果音の音量 0〜1 */
- 12 |   sfxVolume: number;
- 13 | }
- 14 | 
+  8 | export interface Options {
+  9 |   controlScheme: ControlScheme;
+ 10 |   spawnMode: SpawnMode;
+ 11 |   touchScheme: TouchScheme;
+ 12 |   /** フリック判定のしきい値（px） */
+ 13 |   flickThreshold: number;
+ 14 |   /** 両手モードで1列動かすのに必要なスワイプ距離（px） */
+ 15 |   columnStep: number;
+ 16 |   /** 効果音の音量 0〜1 */
+ 17 |   sfxVolume: number;
+ 18 | }
+ 19 | 
 ```
 
 `Options` … オプション画面で変えられる設定の形。
+- `columnStep` … 両手モードで、左の指を何px横に動かすと1列動くか。
 
-**L15–25**
+**L20–30**
 
 ```ts
- 15 | export interface RunRecord {
- 16 |   timeMs: number;
- 17 |   seed: number;
- 18 |   maxChain: number;
- 19 |   moves: number;
- 20 |   /** 1手戻した回数 */
- 21 |   undos?: number;
- 22 |   date: string;
- 23 |   controlScheme: ControlScheme;
- 24 | }
- 25 | 
+ 20 | export interface RunRecord {
+ 21 |   timeMs: number;
+ 22 |   seed: number;
+ 23 |   maxChain: number;
+ 24 |   moves: number;
+ 25 |   /** 1手戻した回数 */
+ 26 |   undos?: number;
+ 27 |   date: string;
+ 28 |   controlScheme: ControlScheme;
+ 29 | }
+ 30 | 
 ```
 
 `RunRecord` … ランキングに残す1回分の記録。
 - `undos?: number` の `?` は「無くてもよい」。1手戻す機能を入れる前に保存された記録には `undos` がないので、省略可能にしてある。
 - `date` … 日時。`new Date().toISOString()` で作る `"2026-11-01T14:30:00.000Z"` 形式の文字列。
 
-**L26–29**
+**L31–35**
 
 ```ts
- 26 | const OPTIONS_KEY = 'dopapuyo.options.v1';
- 27 | const RECORDS_KEY = 'dopapuyo.records.v1';
- 28 | const RANK_LIMIT = 10;
- 29 | 
+ 31 | const OPTIONS_KEY = 'dopapuyo.options.v1';
+ 32 | // v2: 配ぷよをぷよぷよeスポーツ方式に変えたので、v1 の記録とは分けて保存する
+ 33 | const RECORDS_KEY = 'dopapuyo.records.v2';
+ 34 | const RANK_LIMIT = 10;
+ 35 | 
 ```
 
 保存に使う名前（キー）と、ランキングに残す件数。
 キー名に `.v1` を付けておくと、将来保存形式を変えたときに `.v2` にして古いデータと混ざらないようにできる。
+記録は配ぷよの生成方式をぷよぷよeスポーツ方式に変えたときに `.v2` にした。同じシード番号でも配ぷよが変わったので、それ以前の記録とはタイムを比べられないためだ（古い記録は消さずに残るが、表示はされない）。
 
-**L30–36**
+**L36–44**
 
 ```ts
- 30 | export const DEFAULT_OPTIONS: Options = {
- 31 |   controlScheme: 'arrow',
- 32 |   spawnMode: 'reset',
- 33 |   flickThreshold: 24,
- 34 |   sfxVolume: 0.7,
- 35 | };
- 36 | 
+ 36 | export const DEFAULT_OPTIONS: Options = {
+ 37 |   controlScheme: 'arrow',
+ 38 |   spawnMode: 'reset',
+ 39 |   touchScheme: 'single',
+ 40 |   flickThreshold: 24,
+ 41 |   columnStep: 32,
+ 42 |   sfxVolume: 0.7,
+ 43 | };
+ 44 | 
 ```
 
 オプションの初期値。
 
 ## 読み書きの土台
 
-**L37–44**
+**L45–52**
 
 ```ts
- 37 | function read<T>(key: string, fallback: T): T {
- 38 |   try {
- 39 |     const raw = localStorage.getItem(key);
- 40 |     return raw ? (JSON.parse(raw) as T) : fallback;
- 41 |   } catch {
- 42 |     return fallback;
- 43 |   }
- 44 | }
+ 45 | function read<T>(key: string, fallback: T): T {
+ 46 |   try {
+ 47 |     const raw = localStorage.getItem(key);
+ 48 |     return raw ? (JSON.parse(raw) as T) : fallback;
+ 49 |   } catch {
+ 50 |     return fallback;
+ 51 |   }
+ 52 | }
 ```
 
 `read<T>(key, fallback)` … localStorage から読んで JSON として復元する。
 - `<T>` は**ジェネリクス**。呼ぶ側が `read<Options>(...)` のように「何の型として読むか」を指定できる。
-- L39: 保存されていなければ `getItem` は `null` を返す。
-- L40: あれば `JSON.parse` でオブジェクトに戻す。なければ `fallback`（代わりの値）を返す。
+- L47: 保存されていなければ `getItem` は `null` を返す。
+- L48: あれば `JSON.parse` でオブジェクトに戻す。なければ `fallback`（代わりの値）を返す。
 - `try { ... } catch { ... }` … 中でエラーが起きたら `catch` に飛ぶ。プライベートモードや、保存が禁止された環境では localStorage を触るだけでエラーになることがあるので、そのときも `fallback` を返してゲームを止めない。
 
-**L45–53**
+**L53–61**
 
 ```ts
- 45 | 
- 46 | function write(key: string, value: unknown): void {
- 47 |   try {
- 48 |     localStorage.setItem(key, JSON.stringify(value));
- 49 |   } catch {
- 50 |     // 保存できない環境（プライベートモードなど）では記録しない
- 51 |   }
- 52 | }
  53 | 
+ 54 | function write(key: string, value: unknown): void {
+ 55 |   try {
+ 56 |     localStorage.setItem(key, JSON.stringify(value));
+ 57 |   } catch {
+ 58 |     // 保存できない環境（プライベートモードなど）では記録しない
+ 59 |   }
+ 60 | }
+ 61 | 
 ```
 
 `write(key, value)` … `JSON.stringify` でオブジェクトを文字列にして保存する。失敗しても何もしない（記録が残らないだけでゲームは続けられる）。
 `value: unknown` は「何でも受け取る、ただし中身は確かめずには使えない」型。保存するだけなので中身を気にしない。
 
-**L54–57**
+**L62–65**
 
 ```ts
- 54 | export function loadOptions(): Options {
- 55 |   return { ...DEFAULT_OPTIONS, ...read<Partial<Options>>(OPTIONS_KEY, {}) };
- 56 | }
- 57 | 
+ 62 | export function loadOptions(): Options {
+ 63 |   return { ...DEFAULT_OPTIONS, ...read<Partial<Options>>(OPTIONS_KEY, {}) };
+ 64 | }
+ 65 | 
 ```
 
 `loadOptions()` … 保存されたオプションを読み込む。
 `{ ...DEFAULT_OPTIONS, ...保存された値 }` は、**スプレッド構文**でオブジェクトを合成する書き方。後に書いたほうが優先されるので、「初期値の上に、保存されている項目だけ上書き」になる。
 将来オプション項目を増やしても、古い保存データには無い項目が初期値で埋まる。`Partial<Options>` は「Options の項目がそろっていなくてもよい」型。
 
-**L58–61**
+**L66–69**
 
 ```ts
- 58 | export function saveOptions(o: Options): void {
- 59 |   write(OPTIONS_KEY, o);
- 60 | }
- 61 | 
+ 66 | export function saveOptions(o: Options): void {
+ 67 |   write(OPTIONS_KEY, o);
+ 68 | }
+ 69 | 
 ```
 
 `saveOptions()` … オプションを保存する。
 
 ## ランキングの保存形式
 
-**L62–68**
+**L70–76**
 
 ```ts
- 62 | interface RecordStore {
- 63 |   /** key: `${signature}|${target}` → 上位記録 */
- 64 |   top: Record<string, RunRecord[]>;
- 65 |   /** key: `${signature}|${target}|${seed}` → そのシードの自己ベスト */
- 66 |   seedBest: Record<string, RunRecord>;
- 67 | }
- 68 | 
+ 70 | interface RecordStore {
+ 71 |   /** key: `${signature}|${target}` → 上位記録 */
+ 72 |   top: Record<string, RunRecord[]>;
+ 73 |   /** key: `${signature}|${target}|${seed}` → そのシードの自己ベスト */
+ 74 |   seedBest: Record<string, RunRecord>;
+ 75 | }
+ 76 | 
 ```
 
 ランキング全体を1つのオブジェクトにまとめて保存する。
@@ -168,113 +179,113 @@ localStorage はブラウザがサイトごとに用意してくれる小さな�
 - `seedBest` … 「設定の署名|目標点|シード」をキーに、そのシードでの自己ベスト1件。
 - `Record<string, RunRecord[]>` は「キーが文字列、値が記録の配列のオブジェクト」。
 
-**L69–73**
+**L77–81**
 
 ```ts
- 69 | function loadStore(): RecordStore {
- 70 |   const s = read<Partial<RecordStore>>(RECORDS_KEY, {});
- 71 |   return { top: s.top ?? {}, seedBest: s.seedBest ?? {} };
- 72 | }
- 73 | 
+ 77 | function loadStore(): RecordStore {
+ 78 |   const s = read<Partial<RecordStore>>(RECORDS_KEY, {});
+ 79 |   return { top: s.top ?? {}, seedBest: s.seedBest ?? {} };
+ 80 | }
+ 81 | 
 ```
 
 `loadStore()` … 保存されたランキングを読む。項目が欠けていても `?? {}` で空のオブジェクトにして、必ず両方そろった形で返す。
 
-**L74–76**
+**L82–84**
 
 ```ts
- 74 | const topKey = (target: number) => `${configSignature()}|${target}`;
- 75 | const seedKey = (target: number, seed: number) => `${configSignature()}|${target}|${seed}`;
- 76 | 
+ 82 | const topKey = (target: number) => `${configSignature()}|${target}`;
+ 83 | const seedKey = (target: number, seed: number) => `${configSignature()}|${target}|${seed}`;
+ 84 | 
 ```
 
 保存キーを作る関数。`` `${A}|${B}` `` は**テンプレート文字列**で、バッククォートの中に `${}` で値を埋め込める。
 `configSignature()` を毎回呼ぶので、設定定数を変えると自動的に別のキーになり、別枠のランキングになる。
 
-**L77–80**
+**L85–88**
 
 ```ts
- 77 | export function getRanking(target: number): RunRecord[] {
- 78 |   return loadStore().top[topKey(target)] ?? [];
- 79 | }
- 80 | 
+ 85 | export function getRanking(target: number): RunRecord[] {
+ 86 |   return loadStore().top[topKey(target)] ?? [];
+ 87 | }
+ 88 | 
 ```
 
 `getRanking(target)` … その目標点の上位記録。まだなければ空配列。
 
-**L81–84**
+**L89–92**
 
 ```ts
- 81 | export function getSeedBest(target: number, seed: number): RunRecord | undefined {
- 82 |   return loadStore().seedBest[seedKey(target, seed)];
- 83 | }
- 84 | 
+ 89 | export function getSeedBest(target: number, seed: number): RunRecord | undefined {
+ 90 |   return loadStore().seedBest[seedKey(target, seed)];
+ 91 | }
+ 92 | 
 ```
 
 `getSeedBest(target, seed)` … そのシードの自己ベスト。現在の画面では使っていない（結果画面では `submitRecord` の戻り値を使っている）。シード別のベストを画面に出したくなったとき用に残している。
 
-**L85–93**
+**L93–101**
 
 ```ts
- 85 | export interface SubmitResult {
- 86 |   /** ランキング内の順位（1始まり）。圏外なら null */
- 87 |   rank: number | null;
- 88 |   /** 記録前の全体ベスト */
- 89 |   prevBest?: RunRecord;
- 90 |   /** 記録前のこのシードのベスト */
- 91 |   prevSeedBest?: RunRecord;
- 92 | }
- 93 | 
+ 93 | export interface SubmitResult {
+ 94 |   /** ランキング内の順位（1始まり）。圏外なら null */
+ 95 |   rank: number | null;
+ 96 |   /** 記録前の全体ベスト */
+ 97 |   prevBest?: RunRecord;
+ 98 |   /** 記録前のこのシードのベスト */
+ 99 |   prevSeedBest?: RunRecord;
+100 | }
+101 | 
 ```
 
 `SubmitResult` … 記録を登録したときの結果。順位と、登録**前**のベスト（全体・シード別）。結果画面の「ベスト −0:01.23」のような差分表示に使う。
 
 ## 記録の登録 submitRecord
 
-**L94–101**
-
-```ts
- 94 | export function submitRecord(target: number, rec: RunRecord): SubmitResult {
- 95 |   const store = loadStore();
- 96 |   const tk = topKey(target);
- 97 |   const sk = seedKey(target, rec.seed);
- 98 |   const list = store.top[tk] ?? [];
- 99 |   const prevBest = list[0];
-100 |   const prevSeedBest = store.seedBest[sk];
-101 | 
-```
-
-- L95–97: 保存データとキーを用意。
-- L98: 今の上位記録。
-- L99: 配列は速い順に並べてあるので、先頭が今までのベスト。
-- L100: このシードの今までのベスト。
-
 **L102–109**
 
 ```ts
-102 |   const next = [...list, rec].sort((a, b) => a.timeMs - b.timeMs).slice(0, RANK_LIMIT);
-103 |   const idx = next.indexOf(rec);
-104 |   store.top[tk] = next;
-105 |   if (!prevSeedBest || rec.timeMs < prevSeedBest.timeMs) store.seedBest[sk] = rec;
-106 |   write(RECORDS_KEY, store);
-107 |   return { rank: idx >= 0 ? idx + 1 : null, prevBest, prevSeedBest };
-108 | }
+102 | export function submitRecord(target: number, rec: RunRecord): SubmitResult {
+103 |   const store = loadStore();
+104 |   const tk = topKey(target);
+105 |   const sk = seedKey(target, rec.seed);
+106 |   const list = store.top[tk] ?? [];
+107 |   const prevBest = list[0];
+108 |   const prevSeedBest = store.seedBest[sk];
 109 | 
 ```
 
-- L102: 既存の記録に今回の記録を加え、タイムの小さい順に並べ替え（`sort` に「a − b」を返す関数を渡すと小さい順）、上位10件だけ残す（`slice(0, 10)`）。
-- L103: 今回の記録が何番目に入ったか。10件からあふれていれば `-1`。
-- L104: 上位記録を更新。
-- L105: シード別ベストは、まだ無いか、今回のほうが速ければ更新。`!prevSeedBest` は「無ければ」。
-- L106: まとめて保存。
-- L107: 順位は人間向けに1から数える。圏外なら `null`。
+- L103–105: 保存データとキーを用意。
+- L106: 今の上位記録。
+- L107: 配列は速い順に並べてあるので、先頭が今までのベスト。
+- L108: このシードの今までのベスト。
 
-**L110–112**
+**L110–117**
 
 ```ts
-110 | export function clearRecords(): void {
-111 |   write(RECORDS_KEY, { top: {}, seedBest: {} });
-112 | }
+110 |   const next = [...list, rec].sort((a, b) => a.timeMs - b.timeMs).slice(0, RANK_LIMIT);
+111 |   const idx = next.indexOf(rec);
+112 |   store.top[tk] = next;
+113 |   if (!prevSeedBest || rec.timeMs < prevSeedBest.timeMs) store.seedBest[sk] = rec;
+114 |   write(RECORDS_KEY, store);
+115 |   return { rank: idx >= 0 ? idx + 1 : null, prevBest, prevSeedBest };
+116 | }
+117 | 
+```
+
+- L110: 既存の記録に今回の記録を加え、タイムの小さい順に並べ替え（`sort` に「a − b」を返す関数を渡すと小さい順）、上位10件だけ残す（`slice(0, 10)`）。
+- L111: 今回の記録が何番目に入ったか。10件からあふれていれば `-1`。
+- L112: 上位記録を更新。
+- L113: シード別ベストは、まだ無いか、今回のほうが速ければ更新。`!prevSeedBest` は「無ければ」。
+- L114: まとめて保存。
+- L115: 順位は人間向けに1から数える。圏外なら `null`。
+
+**L118–120**
+
+```ts
+118 | export function clearRecords(): void {
+119 |   write(RECORDS_KEY, { top: {}, seedBest: {} });
+120 | }
 ```
 
 `clearRecords()` … 記録をすべて消す（空の状態で上書き保存）。

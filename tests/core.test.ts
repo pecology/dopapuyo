@@ -151,27 +151,42 @@ describe('tsumo', () => {
   it('is deterministic per seed and loops every 128 pairs', () => {
     expect(generateTsumo(123)).toEqual(generateTsumo(123));
     expect(generateTsumo(123)).not.toEqual(generateTsumo(124));
-    expect(generateTsumo(1)).toHaveLength(CONFIG.TSUMO_LOOP);
+    expect(generateTsumo(1)).toHaveLength(128);
   });
 
   it('limits the first two pairs to three colors', () => {
-    for (let seed = 1; seed <= 2000; seed++) {
+    for (let seed = 0; seed < 2000; seed++) {
       const t = generateTsumo(seed);
       const colors = new Set([t[0].axis, t[0].child, t[1].axis, t[1].child]);
       expect(colors.size).toBeLessThanOrEqual(3);
     }
   });
 
-  it('uses every color roughly evenly after the opening', () => {
-    const counts = [0, 0, 0, 0];
-    for (let seed = 1; seed <= 500; seed++) {
-      for (const p of generateTsumo(seed).slice(2)) {
-        counts[p.axis]++;
-        counts[p.child]++;
-      }
+  it('shares the opening between color counts', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const three = generateTsumo(seed, 3).slice(0, 2);
+      expect(generateTsumo(seed, 4).slice(0, 2)).toEqual(three);
+      expect(generateTsumo(seed, 5).slice(0, 2)).toEqual(three);
     }
-    const total = counts.reduce((a, b) => a + b, 0);
-    for (const c of counts) expect(Math.abs(c / total - 0.25)).toBeLessThan(0.01);
+  });
+
+  it('deals each color 64 times per loop apart from the opening', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const t = generateTsumo(seed, 4);
+      const counts = new Map<number, number>();
+      for (const p of t.slice(2)) {
+        counts.set(p.axis, (counts.get(p.axis) ?? 0) + 1);
+        counts.set(p.child, (counts.get(p.child) ?? 0) + 1);
+      }
+      // 4色の表は各色64個。先頭4個を3色の表で上書きするので、残り252個の内訳は各色60〜64個
+      expect(counts.size).toBe(4);
+      for (const c of counts.values()) expect(c).toBeGreaterThanOrEqual(60);
+      for (const c of counts.values()) expect(c).toBeLessThanOrEqual(64);
+    }
+  });
+
+  it('treats seed 65536 as seed 0', () => {
+    expect(generateTsumo(65536)).toEqual(generateTsumo(0));
   });
 });
 

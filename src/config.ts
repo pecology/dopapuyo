@@ -23,10 +23,6 @@ export const CONFIG = {
   ALL_CLEAR_BONUS: 2100,
   /** シード数（1〜SEED_COUNT） */
   SEED_COUNT: 65536,
-  /** ツモのループ手数 */
-  TSUMO_LOOP: 128,
-  /** 最初の2手の色数上限 */
-  OPENING_COLOR_LIMIT: 3,
   /** ネクスト表示数 */
   NEXT_COUNT: 2,
   /** 目標点の一覧 */
@@ -49,11 +45,9 @@ const FAIRNESS_KEYS = [
   'COLOR_COUNT',
   'ALL_CLEAR_BONUS',
   'SEED_COUNT',
-  'TSUMO_LOOP',
-  'OPENING_COLOR_LIMIT',
 ] as const;
 
-const DEFAULT_SIGNATURE = '150|8|30|5|5000|4|2100|65536|128|3';
+const DEFAULT_SIGNATURE = '150|8|30|5|5000|4|2100|65536';
 
 /** デフォルト設定なら 'default'、変更されていればその内容を表す文字列 */
 export function configSignature(): string {
