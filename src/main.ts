@@ -1,4 +1,5 @@
 import './style.css';
+import { registerSW } from 'virtual:pwa-register';
 import { CONFIG, configSignature } from './config';
 import { sound } from './audio/sound';
 import { Field, clampPlacement, type Rotation } from './core/field';
@@ -259,6 +260,7 @@ function goMenu(): void {
   anim = null;
   renderer.clearEffects();
   showOverlay('menu');
+  applyUpdateIfIdle();
 }
 
 // ---------- 1フレームごとの処理 ----------
@@ -625,6 +627,20 @@ clearBtn.addEventListener('click', () => {
 });
 
 new ResizeObserver(() => renderer.resize()).observe($('stage'));
+
+// ---------- オフライン対応（PWA） ----------
+// 新しい版が届いても、遊んでいる途中では切り替えない。メニュー画面に戻ったときに再読み込みして切り替える
+let updateReady = false;
+const updateSW = registerSW({
+  onNeedRefresh() {
+    updateReady = true;
+    applyUpdateIfIdle();
+  },
+});
+
+function applyUpdateIfIdle(): void {
+  if (updateReady && mode === 'menu') void updateSW(true);
+}
 
 // ---------- 起動 ----------
 renderTargets();

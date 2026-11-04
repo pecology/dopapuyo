@@ -28,8 +28,8 @@
 | 15 | [15_tests.md](15_tests.md) | `tests/core.test.ts` | ルール部分の自動テスト |
 | 16 | [16_package_json.md](16_package_json.md) | `package.json` | 使う道具とコマンド |
 | 17 | [17_tsconfig_json.md](17_tsconfig_json.md) | `tsconfig.json` | TypeScript の設定 |
-| 18 | [18_vite_config.md](18_vite_config.md) | `vite.config.ts` | Vite の設定 |
-| 19 | [19_vite_env_d_ts.md](19_vite_env_d_ts.md) | `src/vite-env.d.ts` | CSS を読み込むための宣言 |
+| 18 | [18_vite_config.md](18_vite_config.md) | `vite.config.ts` | Vite の設定、オフライン対応（PWA） |
+| 19 | [19_vite_env_d_ts.md](19_vite_env_d_ts.md) | `src/vite-env.d.ts` | CSS と PWA 登録モジュールを読み込むための宣言 |
 | 20 | [20_deploy_yml.md](20_deploy_yml.md) | `.github/workflows/deploy.yml` | GitHub Pages への自動公開 |
 
 ## 全体の構造
