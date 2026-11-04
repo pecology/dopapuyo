@@ -173,8 +173,9 @@ function placeAt(x: number, rot: Rotation): void {
   if (turn.cleared || turn.dead) endAt = busyUntil;
   sound.place();
 
-  if (options.spawnMode === 'reset') cursor = { x: 2, rot: 0 };
-  else cursor = { x: clampPlacement(x, rot), rot };
+  const nextRot = options.spawnRot === 'keep' ? rot : 0;
+  const nextX = options.spawnCol === 'keep' ? x : 2;
+  cursor = { x: clampPlacement(nextX, nextRot), rot: nextRot };
 }
 
 const handlers: ControlHandlers = {
@@ -483,8 +484,11 @@ function applyOptions(): void {
   for (const b of $('opt-scheme').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
     b.setAttribute('aria-pressed', String(b.dataset.value === options.controlScheme));
   }
-  for (const b of $('opt-spawn').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
-    b.setAttribute('aria-pressed', String(b.dataset.value === options.spawnMode));
+  for (const b of $('opt-spawn-col').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.setAttribute('aria-pressed', String(b.dataset.value === options.spawnCol));
+  }
+  for (const b of $('opt-spawn-rot').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+    b.setAttribute('aria-pressed', String(b.dataset.value === options.spawnRot));
   }
   for (const b of $('opt-touch').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
     b.setAttribute('aria-pressed', String(b.dataset.value === options.touchScheme));
@@ -572,9 +576,15 @@ for (const b of $('opt-scheme').querySelectorAll<HTMLButtonElement>('.seg-btn'))
     applyOptions();
   });
 }
-for (const b of $('opt-spawn').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+for (const b of $('opt-spawn-col').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
   b.addEventListener('click', () => {
-    options = { ...options, spawnMode: b.dataset.value as Options['spawnMode'] };
+    options = { ...options, spawnCol: b.dataset.value as Options['spawnCol'] };
+    applyOptions();
+  });
+}
+for (const b of $('opt-spawn-rot').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+  b.addEventListener('click', () => {
+    options = { ...options, spawnRot: b.dataset.value as Options['spawnRot'] };
     applyOptions();
   });
 }

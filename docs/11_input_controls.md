@@ -463,26 +463,30 @@
 
 スマホを両手で持ち、左手の親指で列、右手の親指で子ぷよの向きを決める操作方式。オプションの「タッチ操作」で片手（`Pointer`）と切り替える。
 2本の指を同時に置き、**どちらを先に離すか**で「置く」と「やめる」を区別するのが特徴。
+左の指は置いた後も押したままでよく、次のペア以降もその指で列を決め続けられる。
 
-**L232–247**
+**L232–250**
 
 ```ts
 232 | 
 233 | /**
 234 |  * 両手モード（タッチ）: 画面の左半分で列、右半分で子ぷよの向きを決める。
-235 |  * - 左の指: 横にスワイプした距離で列を動かす（columnStep px で1列）
+235 |  * - 左の指: 横にスワイプした距離で列を動かす（columnStep px で1列）。置いた後も押したままにすれば、次のペアもその指で列を決められる
 236 |  * - 右の指: フリック方向＝子ぷよの向き。フリックしなければ指を置いたときの向きのまま
-237 |  * - 右を先に離すと設置、左を先に離すとキャンセル。右だけで操作したときは今の列に置く
-238 |  */
-239 | export class TwoHand {
-240 |   enabled = false;
-241 |   threshold = 24;
-242 |   columnStep = 32;
-243 |   private left: { id: number; x0: number; col0: number; col: number } | null = null;
-244 |   private right: { id: number; x0: number; y0: number; rot0: Rotation; rot: Rotation } | null = null;
-245 |   /** 設置・キャンセル後もまだ触れている指（離したときに何もしないよう覚えておく） */
-246 |   private ignored = new Set<number>();
-247 | 
+237 |  * - 右を離すと設置。左を先に離すとキャンセル（列と向きを操作の前に戻す）
+238 |  * - 右だけで操作したときは今の列に置く。左だけで操作して離したときは、その列のまま
+239 |  */
+240 | export class TwoHand {
+241 |   enabled = false;
+242 |   threshold = 24;
+243 |   columnStep = 32;
+244 |   private left: { id: number; x0: number; col0: number; col: number } | null = null;
+245 |   private right: { id: number; x0: number; y0: number; rot0: Rotation; rot: Rotation } | null = null;
+246 |   /** 今の操作を始める前の列と向き（キャンセルで戻す先）。操作中でなければ null */
+247 |   private origin: { col: number; rot: Rotation } | null = null;
+248 |   /** キャンセル後もまだ触れている指（離したときに何もしないよう覚えておく） */
+249 |   private ignored = new Set<number>();
+250 | 
 ```
 
 - `enabled` … 両手モードを選んでいるときだけ true。
@@ -490,129 +494,142 @@
 - `columnStep` … 左の指を何px横に動かすと1列動くか（オプションで変えられる）。
 - `left` … 左半分に置いた指。どの指か（`id`）、置いた x 座標、置いたときの列（`col0`）、今の列（`col`）。
 - `right` … 右半分に置いた指。置いた座標、置いたときの向き（`rot0`）、今の向き（`rot`）。
-- `ignored` … 置いた・やめた後もまだ画面に触れている指。その指を離したときに何も起きないよう覚えておく。
+- `origin` … 今の操作を始める前の列と向き。キャンセルしたときにここへ戻す。
+- `ignored` … キャンセルした後もまだ画面に触れている右の指など。その指を離したときに何も起きないよう覚えておく。
 
-**L248–256**
+**L251–259**
 
 ```ts
-248 |   constructor(
-249 |     private canvas: HTMLCanvasElement,
-250 |     private h: ControlHandlers,
-251 |   ) {
-252 |     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
-253 |     canvas.addEventListener('pointermove', (e) => this.onMove(e));
-254 |     canvas.addEventListener('pointerup', (e) => this.onUp(e, true));
-255 |     canvas.addEventListener('pointercancel', (e) => this.onUp(e, false));
-256 |   }
+251 |   constructor(
+252 |     private canvas: HTMLCanvasElement,
+253 |     private h: ControlHandlers,
+254 |   ) {
+255 |     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
+256 |     canvas.addEventListener('pointermove', (e) => this.onMove(e));
+257 |     canvas.addEventListener('pointerup', (e) => this.onUp(e, true));
+258 |     canvas.addEventListener('pointercancel', (e) => this.onUp(e, false));
+259 |   }
 ```
 
 盤面の canvas に、指を置く・動かす・離す・（OS などに）取り上げられる、の4つのイベントを登録する。`Pointer` と同じ canvas に登録するが、`enabled` で片方だけが反応する。
 
 ### 指を置いたとき onDown
 
-**L257–273**
+**L260–278**
 
 ```ts
-257 | 
-258 |   private onDown(e: PointerEvent): void {
-259 |     if (!this.enabled || e.button === 2) return;
-260 |     e.preventDefault();
-261 |     const rect = this.canvas.getBoundingClientRect();
-262 |     const isLeft = e.clientX < rect.left + rect.width / 2;
-263 |     // 同じ側に2本目の指が来た・操作できない間に触れた指は無視する
-264 |     if ((isLeft ? this.left : this.right) || !this.h.canControl()) {
-265 |       this.ignored.add(e.pointerId);
-266 |       return;
-267 |     }
-268 |     this.canvas.setPointerCapture(e.pointerId);
-269 |     const cur = this.h.cursor();
-270 |     if (isLeft) this.left = { id: e.pointerId, x0: e.clientX, col0: cur.col, col: cur.col };
-271 |     else this.right = { id: e.pointerId, x0: e.clientX, y0: e.clientY, rot0: cur.rot, rot: cur.rot };
-272 |     this.show();
-273 |   }
+260 | 
+261 |   private onDown(e: PointerEvent): void {
+262 |     if (!this.enabled || e.button === 2) return;
+263 |     e.preventDefault();
+264 |     const rect = this.canvas.getBoundingClientRect();
+265 |     const isLeft = e.clientX < rect.left + rect.width / 2;
+266 |     // 同じ側に2本目の指が来たら無視する
+267 |     if (isLeft ? this.left : this.right) {
+268 |       this.ignored.add(e.pointerId);
+269 |       return;
+270 |     }
+271 |     this.canvas.setPointerCapture(e.pointerId);
+272 |     const cur = this.h.cursor();
+273 |     // 連鎖の演出中でも指を置いて列・向きを準備できる（置くのは操作できるようになってから）
+274 |     this.origin ??= { ...cur };
+275 |     if (isLeft) this.left = { id: e.pointerId, x0: e.clientX, col0: cur.col, col: cur.col };
+276 |     else this.right = { id: e.pointerId, x0: e.clientX, y0: e.clientY, rot0: cur.rot, rot: cur.rot };
+277 |     this.show();
+278 |   }
 ```
 
-- L261–262: canvas の左端から幅の半分までを「左半分」とする。`getBoundingClientRect()` は要素の画面上の位置と大きさ。
-- L264–267: すでに同じ側に指がある、または連鎖演出中などで操作できないときは、その指を無視する。
-- L268: 指が canvas の外に出ても、離すまでイベントが届くようにする。
-- L269–271: 今の列・向きを起点として、左右どちらの指かを記録する。
-- L272: 置き先のプレビューを出す。
+- L264–265: canvas の左端から幅の半分までを「左半分」とする。`getBoundingClientRect()` は要素の画面上の位置と大きさ。
+- L267–270: すでに同じ側に指があるときは、その指を無視する。
+- L271: 指が canvas の外に出ても、離すまでイベントが届くようにする。
+- L274: 操作の始まりなら、今の列と向きを `origin` に覚える。`??=` は「左が `null` か `undefined` のときだけ代入する」演算子なので、2本目の指では上書きされない。連鎖の演出中でも指を置いて準備できる（置けるのは操作できるようになってから）。
+- L275–276: 今の列・向きを起点として、左右どちらの指かを記録する。
+- L277: 置き先のプレビューを出す。
 
 ### 指を動かしたとき onMove
 
-**L274–287**
+**L279–292**
 
 ```ts
-274 | 
-275 |   private onMove(e: PointerEvent): void {
-276 |     const l = this.left;
-277 |     const r = this.right;
-278 |     if (l && l.id === e.pointerId) {
-279 |       const col = l.col0 + Math.round((e.clientX - l.x0) / this.columnStep);
-280 |       l.col = Math.min(COLS - 1, Math.max(0, col));
-281 |     } else if (r && r.id === e.pointerId) {
-282 |       r.rot = flickRotation(e.clientX - r.x0, e.clientY - r.y0, this.threshold) ?? r.rot0;
-283 |     } else {
-284 |       return;
-285 |     }
-286 |     this.show();
-287 |   }
+279 | 
+280 |   private onMove(e: PointerEvent): void {
+281 |     const l = this.left;
+282 |     const r = this.right;
+283 |     if (l && l.id === e.pointerId) {
+284 |       const col = l.col0 + Math.round((e.clientX - l.x0) / this.columnStep);
+285 |       l.col = Math.min(COLS - 1, Math.max(0, col));
+286 |     } else if (r && r.id === e.pointerId) {
+287 |       r.rot = flickRotation(e.clientX - r.x0, e.clientY - r.y0, this.threshold) ?? r.rot0;
+288 |     } else {
+289 |       return;
+290 |     }
+291 |     this.show();
+292 |   }
 ```
 
-- L279–280: 左の指は、置いた位置から横に動いた距離を `columnStep` で割って四捨五入（`Math.round`）し、その列数だけずらす。0〜5列目からはみ出さないよう `Math.min` / `Math.max` で押さえる。
-- L282: 右の指は、動いた方向から子ぷよの向きを決める。まだフリックの距離に届いていなければ、置いたときの向きのまま。
-- L283–285: 両手モードで使っていない指なら何もしない。
+- L284–285: 左の指は、置いた位置から横に動いた距離を `columnStep` で割って四捨五入（`Math.round`）し、その列数だけずらす。0〜5列目からはみ出さないよう `Math.min` / `Math.max` で押さえる。
+- L287: 右の指は、動いた方向から子ぷよの向きを決める。まだフリックの距離に届いていなければ、置いたときの向きのまま。
+- L288–290: 両手モードで使っていない指なら何もしない。
 
 ### 指を離したとき onUp
 
-**L288–303**
+**L293–323**
 
 ```ts
-288 | 
-289 |   private onUp(e: PointerEvent, commit: boolean): void {
-290 |     if (this.ignored.delete(e.pointerId)) return;
-291 |     const l = this.left;
-292 |     const r = this.right;
-293 |     if (r && r.id === e.pointerId) {
-294 |       const { col, rot } = this.state();
-295 |       this.release(e.pointerId);
-296 |       if (commit && this.h.canControl()) this.h.pointerPlace(col, rot);
-297 |     } else if (l && l.id === e.pointerId) {
-298 |       // 左を先に離した＝キャンセル。列は指を置く前に戻す
-299 |       this.h.preview(l.col0, r ? r.rot0 : this.h.cursor().rot, false);
-300 |       this.release(e.pointerId);
-301 |       if (r) this.h.cancelled();
-302 |     }
-303 |   }
+293 | 
+294 |   private onUp(e: PointerEvent, commit: boolean): void {
+295 |     if (this.ignored.delete(e.pointerId)) return;
+296 |     const l = this.left;
+297 |     const r = this.right;
+298 |     if (r && r.id === e.pointerId) {
+299 |       // 右を離した＝置く。左の指はそのまま次のペアの列決めに使い続ける
+300 |       const { col, rot } = this.state();
+301 |       this.right = null;
+302 |       this.origin = null;
+303 |       if (commit && this.h.canControl()) this.h.pointerPlace(col, rot);
+304 |       if (this.left) {
+305 |         // 次のペアの開始位置（キャンセルで戻す先）を覚えてから、左の指の列に合わせる
+306 |         this.origin = this.h.cursor();
+307 |         this.show();
+308 |       }
+309 |     } else if (l && l.id === e.pointerId) {
+310 |       this.left = null;
+311 |       if (r) {
+312 |         // 左を先に離した＝キャンセル。右の指は離すまで無視する
+313 |         const back = this.origin ?? this.h.cursor();
+314 |         this.ignored.add(r.id);
+315 |         this.right = null;
+316 |         this.origin = null;
+317 |         this.h.preview(back.col, back.rot, false);
+318 |         this.h.cancelled();
+319 |       } else {
+320 |         this.origin = null;
+321 |       }
+322 |     }
+323 |   }
 ```
 
-- L290: 無視する指なら、覚えていたのを消して終わり（`Set` の `delete` は、消せたら true を返す）。
-- L293–296: **右の指を離した＝置く**。左の指がまだ触れていれば、その列に置く。右だけで操作していたなら今の列に置く。`commit` が false（`pointercancel`）のときは置かない。
-- L297–301: **左の指を先に離した＝やめる**。列と向きを指を置く前に戻す。右の指も触れていたときだけ、キャンセル音を鳴らす。
+- L295: 無視する指なら、覚えていたのを消して終わり（`Set` の `delete` は、消せたら true を返す）。
+- L298–303: **右の指を離した＝置く**。左の指が触れていればその列に、右だけで操作していたなら今の列に置く。`commit` が false（`pointercancel`）のときや、連鎖の演出中で操作できないときは置かない。
+- L304–308: 左の指をまだ押しているなら、次のペアもその指で列を決める。置いた直後のカーソルは「次のペアの開始位置」（オプションで3列目に戻る、など）になっているので、それをキャンセル用に `origin` に覚えてから、左の指の列に合わせ直す。
+- L309–318: **右を置いたまま左の指を離した＝やめる**。列と向きを `origin`（操作の前）に戻し、キャンセル音を鳴らす。右の指は、後で離しても置かれないよう `ignored` に入れる。
+- L319–321: 左の指だけで操作して離したときは、列はそのまま。
 
-**L304–321**
+**L324–334**
 
 ```ts
-304 | 
-305 |   /** 操作を終える。離した指以外でまだ触れている指は、離すまで無視する */
-306 |   private release(liftedId: number): void {
-307 |     for (const f of [this.left, this.right]) if (f && f.id !== liftedId) this.ignored.add(f.id);
-308 |     this.left = null;
-309 |     this.right = null;
-310 |   }
-311 | 
-312 |   private state(): { col: number; rot: Rotation } {
-313 |     const cur = this.h.cursor();
-314 |     return { col: this.left ? this.left.col : cur.col, rot: this.right ? this.right.rot : cur.rot };
-315 |   }
-316 | 
-317 |   private show(): void {
-318 |     const { col, rot } = this.state();
-319 |     this.h.preview(col, rot, false);
-320 |   }
-321 | }
+324 | 
+325 |   private state(): { col: number; rot: Rotation } {
+326 |     const cur = this.h.cursor();
+327 |     return { col: this.left ? this.left.col : cur.col, rot: this.right ? this.right.rot : cur.rot };
+328 |   }
+329 | 
+330 |   private show(): void {
+331 |     const { col, rot } = this.state();
+332 |     this.h.preview(col, rot, false);
+333 |   }
+334 | }
 ```
 
-- `release` … 操作を終える。たとえば右を離して置いたとき、左の指はまだ触れているので `ignored` に入れ、後で離しても「キャンセル」にならないようにする。
 - `state` … 今の列と向き。左の指があればその列、右の指があればその向き、なければ今のカーソルのものを使う。
 - `show` … 置き先のプレビューを出す。

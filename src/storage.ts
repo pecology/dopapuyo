@@ -7,7 +7,10 @@ export type TouchScheme = 'single' | 'twohand';
 
 export interface Options {
   controlScheme: ControlScheme;
-  spawnMode: SpawnMode;
+  /** 置いた後の次ペアの列（3列目に戻す／引き継ぐ） */
+  spawnCol: SpawnMode;
+  /** 置いた後の次ペアの子ぷよの向き（上に戻す／引き継ぐ） */
+  spawnRot: SpawnMode;
   touchScheme: TouchScheme;
   /** フリック判定のしきい値（px） */
   flickThreshold: number;
@@ -35,7 +38,8 @@ const RANK_LIMIT = 10;
 
 export const DEFAULT_OPTIONS: Options = {
   controlScheme: 'arrow',
-  spawnMode: 'reset',
+  spawnCol: 'reset',
+  spawnRot: 'reset',
   touchScheme: 'single',
   flickThreshold: 24,
   columnStep: 32,
@@ -60,7 +64,11 @@ function write(key: string, value: unknown): void {
 }
 
 export function loadOptions(): Options {
-  return { ...DEFAULT_OPTIONS, ...read<Partial<Options>>(OPTIONS_KEY, {}) };
+  const saved = read<Partial<Options> & { spawnMode?: SpawnMode }>(OPTIONS_KEY, {});
+  // 列と向きを別々に設定できるようになる前の保存形式（spawnMode が両方を兼ねていた）
+  const { spawnMode, ...rest } = saved;
+  const legacy = spawnMode ? { spawnCol: spawnMode, spawnRot: spawnMode } : {};
+  return { ...DEFAULT_OPTIONS, ...legacy, ...rest };
 }
 
 export function saveOptions(o: Options): void {

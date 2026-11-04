@@ -343,7 +343,7 @@
 - ゲーム本体は最後の盤面しか持っていないので、途中の盤面はこうして作る。
 - L170: アニメーションの情報をまとめる。
 
-**L171–179**
+**L171–180**
 
 ```ts
 171 |   firedPops = 0;
@@ -351,59 +351,61 @@
 173 |   if (turn.cleared || turn.dead) endAt = busyUntil;
 174 |   sound.place();
 175 | 
-176 |   if (options.spawnMode === 'reset') cursor = { x: 2, rot: 0 };
-177 |   else cursor = { x: clampPlacement(x, rot), rot };
-178 | }
-179 | 
+176 |   const nextRot = options.spawnRot === 'keep' ? rot : 0;
+177 |   const nextX = options.spawnCol === 'keep' ? x : 2;
+178 |   cursor = { x: clampPlacement(nextX, nextRot), rot: nextRot };
+179 | }
+180 | 
 ```
 
 - L172: 演出が終わる時刻まで操作を止める。
 - L173: この手でクリアか窒息したなら、終了時刻は演出が終わる瞬間。**タイムは最後の連鎖が終わった瞬間で確定**、という仕様はここで決まる。
-- L176–177: 次のペアの開始位置。リセットなら3列目・子が上、引き継ぎなら今置いた位置と向き。
+- L176–178: 次のペアの開始位置。向きと列はオプションで別々に決める。向きは「上に戻す」なら 0、「引き継ぐ」なら今置いた向き。列は「戻す」なら3列目（`2`）、「引き継ぐ」なら今置いた列。最後に `clampPlacement` で、横向きのときに盤面からはみ出さない列に直す。
+
 
 ## 入力に渡す操作の一覧 handlers
 
-**L180–193**
+**L181–194**
 
 ```ts
-180 | const handlers: ControlHandlers = {
-181 |   canControl,
-182 |   move(dx) {
-183 |     const min = cursor.rot === 3 ? 1 : 0;
-184 |     const max = cursor.rot === 1 ? 4 : 5;
-185 |     const nx = cursor.x + dx;
-186 |     if (nx < min || nx > max) return false;
-187 |     cursor = { ...cursor, x: nx };
-188 |     sound.move();
-189 |     return true;
-190 |   },
-191 |   moveToWall(dx) {
-192 |     while (handlers.move(dx));
-193 |   },
+181 | const handlers: ControlHandlers = {
+182 |   canControl,
+183 |   move(dx) {
+184 |     const min = cursor.rot === 3 ? 1 : 0;
+185 |     const max = cursor.rot === 1 ? 4 : 5;
+186 |     const nx = cursor.x + dx;
+187 |     if (nx < min || nx > max) return false;
+188 |     cursor = { ...cursor, x: nx };
+189 |     sound.move();
+190 |     return true;
+191 |   },
+192 |   moveToWall(dx) {
+193 |     while (handlers.move(dx));
+194 |   },
 ```
 
 `controls.ts` の `ControlHandlers` の形どおりに、実際の処理を書いたオブジェクト。`canControl,` は `canControl: canControl` の省略形。
 - `move(dx)` … カーソルを左右に動かす。向きによって動ける範囲が違う（子が左なら1列目より左には行けない、子が右なら5列目まで）。動けたら移動音を鳴らして true。
 - `moveToWall(dx)` … 動けなくなるまで `move` をくり返す。`while (条件);` は中身のない while で、条件の関数を呼ぶこと自体が処理になっている。
 
-**L194–208**
+**L195–209**
 
 ```ts
-194 |   rotate(dir) {
-195 |     const rot = ((cursor.rot + dir + 4) % 4) as Rotation;
-196 |     cursor = { x: clampPlacement(cursor.x, rot), rot };
-197 |     sound.rotate();
-198 |   },
-199 |   setRotation(rot) {
-200 |     cursor = { x: clampPlacement(cursor.x, rot), rot };
-201 |   },
-202 |   place() {
-203 |     placeAt(cursor.x, cursor.rot);
-204 |   },
-205 |   placeAt(col) {
-206 |     cursor = { ...cursor, x: col };
-207 |     placeAt(col, cursor.rot);
-208 |   },
+195 |   rotate(dir) {
+196 |     const rot = ((cursor.rot + dir + 4) % 4) as Rotation;
+197 |     cursor = { x: clampPlacement(cursor.x, rot), rot };
+198 |     sound.rotate();
+199 |   },
+200 |   setRotation(rot) {
+201 |     cursor = { x: clampPlacement(cursor.x, rot), rot };
+202 |   },
+203 |   place() {
+204 |     placeAt(cursor.x, cursor.rot);
+205 |   },
+206 |   placeAt(col) {
+207 |     cursor = { ...cursor, x: col };
+208 |     placeAt(col, cursor.rot);
+209 |   },
 ```
 
 - `rotate(dir)` … 向きを回す。`+ 4` してから `% 4` するのは、左回転で -1 になったときに `3` に戻すため（`-1 % 4` は JavaScript では `-1` になってしまう）。回した後に壁からはみ出すなら `clampPlacement` で内側にずらす（壁蹴り）。
@@ -411,24 +413,24 @@
 - `place()` … 今のカーソル位置に置く。
 - `placeAt(col)` … 指定した列に置く（直接指定方式の HJKL;'）。
 
-**L209–223**
+**L210–224**
 
 ```ts
-209 |   preview(col, rot, outside) {
-210 |     cursor = { x: col, rot };
-211 |     cancelHint = outside;
-212 |   },
-213 |   cancelled() {
-214 |     cancelHint = false;
-215 |     sound.cancel();
-216 |   },
-217 |   pointerPlace(col, rot) {
-218 |     placeAt(col, rot);
-219 |   },
-220 |   cursor() {
-221 |     return { col: cursor.x, rot: cursor.rot };
-222 |   },
-223 |   undo,
+210 |   preview(col, rot, outside) {
+211 |     cursor = { x: col, rot };
+212 |     cancelHint = outside;
+213 |   },
+214 |   cancelled() {
+215 |     cancelHint = false;
+216 |     sound.cancel();
+217 |   },
+218 |   pointerPlace(col, rot) {
+219 |     placeAt(col, rot);
+220 |   },
+221 |   cursor() {
+222 |     return { col: cursor.x, rot: cursor.rot };
+223 |   },
+224 |   undo,
 ```
 
 - `preview` … タッチ中、カーソルを指の位置と向きに合わせ、キャンセル表示のオンオフを覚える。
@@ -438,31 +440,31 @@
 - `undo,` … 上で定義した `undo` 関数をそのまま渡す。
 
 
-**L224–245**
+**L225–246**
 
 ```ts
-224 |   retry() {
-225 |     if (mode === 'menu' || !game) return;
-226 |     startGame(game.seed);
-227 |   },
-228 |   newSeed() {
-229 |     if (mode === 'menu') return;
-230 |     startGame(randomSeed());
-231 |   },
-232 |   menu() {
-233 |     // オプション・ランキングはメニューから開くので、閉じてメニューに戻る
-234 |     if (!ui.options.hidden || !ui.ranking.hidden) {
-235 |       showOverlay('menu');
-236 |       return;
-237 |     }
-238 |     goMenu();
-239 |   },
-240 |   start() {
-241 |     if (mode === 'menu' && ui.options.hidden && ui.ranking.hidden) startGame(chosenSeed());
-242 |     else if (mode === 'result') startGame(game ? game.seed : chosenSeed());
-243 |   },
-244 | };
-245 | 
+225 |   retry() {
+226 |     if (mode === 'menu' || !game) return;
+227 |     startGame(game.seed);
+228 |   },
+229 |   newSeed() {
+230 |     if (mode === 'menu') return;
+231 |     startGame(randomSeed());
+232 |   },
+233 |   menu() {
+234 |     // オプション・ランキングはメニューから開くので、閉じてメニューに戻る
+235 |     if (!ui.options.hidden || !ui.ranking.hidden) {
+236 |       showOverlay('menu');
+237 |       return;
+238 |     }
+239 |     goMenu();
+240 |   },
+241 |   start() {
+242 |     if (mode === 'menu' && ui.options.hidden && ui.ranking.hidden) startGame(chosenSeed());
+243 |     else if (mode === 'result') startGame(game ? game.seed : chosenSeed());
+244 |   },
+245 | };
+246 | 
 ```
 
 - `retry` … 同じシードで最初から。メニュー中は何もしない。
@@ -470,77 +472,77 @@
 - `menu`（Esc）… オプションやランキングを開いていればメニューに戻るだけ。そうでなければ（プレイ中・結果画面）メニューへ。
 - `start`（Enter / Space）… メニュー画面ならゲーム開始。結果画面なら同じシードでもう一度。
 
-**L246–254**
+**L247–255**
 
 ```ts
-246 | const keyboard = new Keyboard(handlers);
-247 | const pointer = new Pointer(
-248 |   canvas,
-249 |   (x, y) => renderer.columnAt(x, y),
-250 |   (x, y) => renderer.isOutside(x, y),
-251 |   handlers,
-252 | );
-253 | const twoHand = new TwoHand(canvas, handlers);
-254 | 
+247 | const keyboard = new Keyboard(handlers);
+248 | const pointer = new Pointer(
+249 |   canvas,
+250 |   (x, y) => renderer.columnAt(x, y),
+251 |   (x, y) => renderer.isOutside(x, y),
+252 |   handlers,
+253 | );
+254 | const twoHand = new TwoHand(canvas, handlers);
+255 | 
 ```
 
 キーボードとタッチの入力を作る。タッチには、列を求める関数と盤面外を判定する関数を renderer から渡す（`(x, y) => renderer.columnAt(x, y)` のように包んで渡す）。
 タッチは片手モード（`Pointer`）と両手モード（`TwoHand`）の両方を作っておき、オプションで選んだほうだけを有効にする（下の `applyOptions`）。
 
 
-**L255–262**
+**L256–263**
 
 ```ts
-255 | function goMenu(): void {
-256 |   mode = 'menu';
-257 |   game = null;
-258 |   anim = null;
-259 |   renderer.clearEffects();
-260 |   showOverlay('menu');
-261 | }
-262 | 
+256 | function goMenu(): void {
+257 |   mode = 'menu';
+258 |   game = null;
+259 |   anim = null;
+260 |   renderer.clearEffects();
+261 |   showOverlay('menu');
+262 | }
+263 | 
 ```
 
 `goMenu()` … メニューに戻る。ゲームを捨てて、エフェクトも消す。
 
 ## 毎フレーム: 演出のきっかけ processAnimation
 
-**L263–276**
+**L264–277**
 
 ```ts
-263 | // ---------- 1フレームごとの処理 ----------
-264 | function processAnimation(now: number): void {
-265 |   if (!anim || !game) return;
-266 |   const e = now - anim.start;
-267 |   const steps = anim.turn.chain.steps;
-268 |   const tl = anim.turn.timeline;
-269 |   while (firedPops < steps.length && e >= tl.steps[firedPops].popStart) {
-270 |     const step = steps[firedPops];
-271 |     renderer.onPop(step, now);
-272 |     sound.pop(step.chain);
-273 |     revealedScore += step.score;
-274 |     revealedMaxChain = Math.max(revealedMaxChain, step.chain);
-275 |     firedPops++;
-276 |   }
+264 | // ---------- 1フレームごとの処理 ----------
+265 | function processAnimation(now: number): void {
+266 |   if (!anim || !game) return;
+267 |   const e = now - anim.start;
+268 |   const steps = anim.turn.chain.steps;
+269 |   const tl = anim.turn.timeline;
+270 |   while (firedPops < steps.length && e >= tl.steps[firedPops].popStart) {
+271 |     const step = steps[firedPops];
+272 |     renderer.onPop(step, now);
+273 |     sound.pop(step.chain);
+274 |     revealedScore += step.score;
+275 |     revealedMaxChain = Math.max(revealedMaxChain, step.chain);
+276 |     firedPops++;
+277 |   }
 ```
 
 アニメーションの経過時間を見て、「1連鎖が消える瞬間」を過ぎていたら、その瞬間の処理を1回だけ行う。
-- L269: まだ処理していない連鎖のうち、消え始めの時刻を過ぎたものを順に処理する。1フレームの間に2つ過ぎていても取りこぼさないよう `while` にしている。
-- L271–275: 破片などのエフェクト、キィン音、スコアの加算（表示用）、最大連鎖の更新、処理済みの数を1つ進める。
+- L270: まだ処理していない連鎖のうち、消え始めの時刻を過ぎたものを順に処理する。1フレームの間に2つ過ぎていても取りこぼさないよう `while` にしている。
+- L272–276: 破片などのエフェクト、キィン音、スコアの加算（表示用）、最大連鎖の更新、処理済みの数を1つ進める。
 
-**L277–286**
+**L278–287**
 
 ```ts
-277 |   if (e >= tl.total) {
-278 |     if (anim.turn.chain.allClear) {
-279 |       renderer.banner('ALL CLEAR', now);
-280 |       sound.allClear();
-281 |     }
-282 |     revealedScore = game.score;
-283 |     anim = null;
-284 |   }
-285 | }
-286 | 
+278 |   if (e >= tl.total) {
+279 |     if (anim.turn.chain.allClear) {
+280 |       renderer.banner('ALL CLEAR', now);
+281 |       sound.allClear();
+282 |     }
+283 |     revealedScore = game.score;
+284 |     anim = null;
+285 |   }
+286 | }
+287 | 
 ```
 
 演出が全部終わったら:
@@ -549,163 +551,163 @@
 
 ## 毎フレーム: 終了の処理 processEnd
 
-**L287–303**
+**L288–304**
 
 ```ts
-287 | function processEnd(now: number): void {
-288 |   if (!game || endAt === null || endHandled || now < endAt) return;
-289 |   endHandled = true;
-290 |   const elapsed = endAt - startAt + penaltyMs;
-291 |   if (game.finished === 'cleared') {
-292 |     sound.clear();
-293 |     renderer.banner('CLEAR!', now, 1100);
-294 |     const rec: RunRecord = {
-295 |       timeMs: Math.round(elapsed),
-296 |       seed: game.seed,
-297 |       maxChain: game.maxChain,
-298 |       moves: game.moves,
-299 |       undos: game.undos,
-300 |       date: new Date().toISOString(),
-301 |       controlScheme: options.controlScheme,
-302 |     };
-303 |     const res = submitRecord(target, rec);
+288 | function processEnd(now: number): void {
+289 |   if (!game || endAt === null || endHandled || now < endAt) return;
+290 |   endHandled = true;
+291 |   const elapsed = endAt - startAt + penaltyMs;
+292 |   if (game.finished === 'cleared') {
+293 |     sound.clear();
+294 |     renderer.banner('CLEAR!', now, 1100);
+295 |     const rec: RunRecord = {
+296 |       timeMs: Math.round(elapsed),
+297 |       seed: game.seed,
+298 |       maxChain: game.maxChain,
+299 |       moves: game.moves,
+300 |       undos: game.undos,
+301 |       date: new Date().toISOString(),
+302 |       controlScheme: options.controlScheme,
+303 |     };
+304 |     const res = submitRecord(target, rec);
 ```
 
 終了時刻を過ぎたら一度だけ実行する。
-- L288: ゲームがない、終わる予定がない、処理済み、まだ時刻前、のどれかなら何もしない。
-- L290: **最終タイム** ＝ 終了時刻 − 開始時刻 ＋ ペナルティ。
-- L292–293: クリアの音と「CLEAR!」表示。
-- L294–303: ランキングに登録する記録を作って保存。
+- L289: ゲームがない、終わる予定がない、処理済み、まだ時刻前、のどれかなら何もしない。
+- L291: **最終タイム** ＝ 終了時刻 − 開始時刻 ＋ ペナルティ。
+- L293–294: クリアの音と「CLEAR!」表示。
+- L295–304: ランキングに登録する記録を作って保存。
 
-**L304–319**
+**L305–320**
 
 ```ts
-304 |     const g = game;
-305 |     window.setTimeout(() => {
-306 |       if (game !== g || !g.finished) return;
-307 |       showResult('cleared', elapsed, res.rank, res.prevBest?.timeMs, res.prevSeedBest?.timeMs);
-308 |     }, 750);
-309 |   } else {
-310 |     sound.dead();
-311 |     renderer.banner('窒息…', now, 1100);
-312 |     const g = game;
-313 |     window.setTimeout(() => {
-314 |       if (game !== g || !g.finished) return;
-315 |       showResult('dead', elapsed, null);
-316 |     }, 750);
-317 |   }
-318 | }
-319 | 
+305 |     const g = game;
+306 |     window.setTimeout(() => {
+307 |       if (game !== g || !g.finished) return;
+308 |       showResult('cleared', elapsed, res.rank, res.prevBest?.timeMs, res.prevSeedBest?.timeMs);
+309 |     }, 750);
+310 |   } else {
+311 |     sound.dead();
+312 |     renderer.banner('窒息…', now, 1100);
+313 |     const g = game;
+314 |     window.setTimeout(() => {
+315 |       if (game !== g || !g.finished) return;
+316 |       showResult('dead', elapsed, null);
+317 |     }, 750);
+318 |   }
+319 | }
+320 | 
 ```
 
-- L304–308: 0.75秒後に結果画面を出す（「CLEAR!」の演出を見せるため）。`setTimeout(関数, ミリ秒)` で、指定時間後に関数を呼ぶ。
-  - L306: その0.75秒の間にリトライなどで別のゲームになっていたり、1手戻して終了状態が解除されていたりしたら、結果画面は出さない。`g` に今のゲームを控えておき、比べている。
-- L309–317: 窒息した場合。記録は残さず、結果画面だけ出す。
+- L305–309: 0.75秒後に結果画面を出す（「CLEAR!」の演出を見せるため）。`setTimeout(関数, ミリ秒)` で、指定時間後に関数を呼ぶ。
+  - L307: その0.75秒の間にリトライなどで別のゲームになっていたり、1手戻して終了状態が解除されていたりしたら、結果画面は出さない。`g` に今のゲームを控えておき、比べている。
+- L310–318: 窒息した場合。記録は残さず、結果画面だけ出す。
 
 ## 毎フレーム: 画面上部の表示 updateHud
 
-**L320–330**
+**L321–331**
 
 ```ts
-320 | function updateHud(now: number, dt: number): void {
-321 |   const elapsed = mode === 'menu' ? 0 : (endAt !== null && now >= endAt ? endAt : now) - startAt + penaltyMs;
-322 |   ui.time.textContent = formatTime(game ? elapsed : 0);
-323 |   const real = revealedScore;
-324 |   shownScore += (real - shownScore) * Math.min(1, dt / 70);
-325 |   if (Math.abs(real - shownScore) < 1) shownScore = real;
-326 |   ui.score.textContent = fmt(Math.round(shownScore));
-327 |   ui.bar.style.width = `${Math.min(100, (shownScore / target) * 100)}%`;
-328 |   ui.maxchain.textContent = `${revealedMaxChain}連鎖`;
-329 |   ui.moves.textContent = String(game?.moves ?? 0);
-330 | 
+321 | function updateHud(now: number, dt: number): void {
+322 |   const elapsed = mode === 'menu' ? 0 : (endAt !== null && now >= endAt ? endAt : now) - startAt + penaltyMs;
+323 |   ui.time.textContent = formatTime(game ? elapsed : 0);
+324 |   const real = revealedScore;
+325 |   shownScore += (real - shownScore) * Math.min(1, dt / 70);
+326 |   if (Math.abs(real - shownScore) < 1) shownScore = real;
+327 |   ui.score.textContent = fmt(Math.round(shownScore));
+328 |   ui.bar.style.width = `${Math.min(100, (shownScore / target) * 100)}%`;
+329 |   ui.maxchain.textContent = `${revealedMaxChain}連鎖`;
+330 |   ui.moves.textContent = String(game?.moves ?? 0);
+331 | 
 ```
 
-- L321: 表示するタイム。終了時刻を過ぎていれば終了時刻で止め、そうでなければ現在時刻まで。どちらもペナルティを足す。
-- L324: 表示スコアを、本当の値との差の一部ずつ近づける（カウントアップ演出）。`dt / 70` で、フレームの間隔に関係なく約70msで追いつく。
-- L325: 差が1未満になったらぴったり合わせる。
-- L327: 目標点に対する進み具合のバーの長さ（最大100%）。
+- L322: 表示するタイム。終了時刻を過ぎていれば終了時刻で止め、そうでなければ現在時刻まで。どちらもペナルティを足す。
+- L325: 表示スコアを、本当の値との差の一部ずつ近づける（カウントアップ演出）。`dt / 70` で、フレームの間隔に関係なく約70msで追いつく。
+- L326: 差が1未満になったらぴったり合わせる。
+- L328: 目標点に対する進み具合のバーの長さ（最大100%）。
 
-**L331–344**
+**L332–345**
 
 ```ts
-331 |   // 1手戻すボタン（ネクスト列の下に置く）
-332 |   const inPlay = mode === 'playing' && !!game;
-333 |   ui.undo.hidden = !inPlay;
-334 |   if (inPlay) {
-335 |     ui.undo.disabled = !canUndo();
-336 |     const slot = renderer.sideSlot();
-337 |     const h = ui.undo.offsetHeight;
-338 |     ui.undo.style.left = `${slot.left}px`;
-339 |     ui.undo.style.top = `${slot.bottom - h}px`;
-340 |     ui.undo.style.width = `${slot.width}px`;
-341 |   }
-342 |   ui.resultUndo.hidden = !(mode === 'result' && game?.finished === 'dead' && game.canUndo());
-343 | }
-344 | 
+332 |   // 1手戻すボタン（ネクスト列の下に置く）
+333 |   const inPlay = mode === 'playing' && !!game;
+334 |   ui.undo.hidden = !inPlay;
+335 |   if (inPlay) {
+336 |     ui.undo.disabled = !canUndo();
+337 |     const slot = renderer.sideSlot();
+338 |     const h = ui.undo.offsetHeight;
+339 |     ui.undo.style.left = `${slot.left}px`;
+340 |     ui.undo.style.top = `${slot.bottom - h}px`;
+341 |     ui.undo.style.width = `${slot.width}px`;
+342 |   }
+343 |   ui.resultUndo.hidden = !(mode === 'result' && game?.finished === 'dead' && game.canUndo());
+344 | }
+345 | 
 ```
 
 「1手戻す」ボタンの表示。
-- L332–333: プレイ中だけ表示。
-- L335: 戻せないとき（演出中など）は押せない状態に。
-- L336–340: canvas の上に重ねたボタンを、ネクスト列の下端に合わせて置く。canvas の大きさは画面によって変わるので、毎フレーム renderer に位置を聞いて合わせている。
-- L342: 結果画面の「1手戻して続ける」ボタンは、窒息して戻せるときだけ表示。
+- L333–334: プレイ中だけ表示。
+- L336: 戻せないとき（演出中など）は押せない状態に。
+- L337–341: canvas の上に重ねたボタンを、ネクスト列の下端に合わせて置く。canvas の大きさは画面によって変わるので、毎フレーム renderer に位置を聞いて合わせている。
+- L343: 結果画面の「1手戻して続ける」ボタンは、窒息して戻せるときだけ表示。
 
 ## メインループ frame
 
-**L345–368**
+**L346–369**
 
 ```ts
-345 | let last = performance.now();
-346 | function frame(now: number): void {
-347 |   const dt = Math.min(50, now - last);
-348 |   last = now;
-349 |   keyboard.update(now);
-350 |   processAnimation(now);
-351 |   processEnd(now);
-352 |   updateHud(now, dt);
-353 |   renderer.render(
-354 |     {
-355 |       field: game ? game.field : emptyField,
-356 |       anim,
-357 |       current: game && !game.finished ? game.current() : null,
-358 |       cursor,
-359 |       nexts: game ? game.nexts() : [],
-360 |       ghost: !!game && !game.finished,
-361 |       cancelHint,
-362 |     },
-363 |     now,
-364 |     dt,
-365 |   );
-366 |   requestAnimationFrame(frame);
-367 | }
-368 | 
+346 | let last = performance.now();
+347 | function frame(now: number): void {
+348 |   const dt = Math.min(50, now - last);
+349 |   last = now;
+350 |   keyboard.update(now);
+351 |   processAnimation(now);
+352 |   processEnd(now);
+353 |   updateHud(now, dt);
+354 |   renderer.render(
+355 |     {
+356 |       field: game ? game.field : emptyField,
+357 |       anim,
+358 |       current: game && !game.finished ? game.current() : null,
+359 |       cursor,
+360 |       nexts: game ? game.nexts() : [],
+361 |       ghost: !!game && !game.finished,
+362 |       cancelHint,
+363 |     },
+364 |     now,
+365 |     dt,
+366 |   );
+367 |   requestAnimationFrame(frame);
+368 | }
+369 | 
 ```
 
 1フレームごとに呼ばれる関数。
-- L347: 前のフレームからの経過時間。タブを裏に回していた後などに大きな値になると破片が吹っ飛ぶので、最大50msに抑える。
-- L349–352: 長押しの移動 → 演出のきっかけ → 終了の処理 → 上部の表示、の順に更新。
-- L353–365: 描画担当に「今描くもの」を渡して描いてもらう。メニュー中は飾りの盤面 `emptyField` を描く。
-- L366: `requestAnimationFrame(frame)` … 「次に画面を描き替えるタイミングで、もう一度 frame を呼んで」とブラウザに頼む。これで画面のリフレッシュレート（多くは60回/秒）に合わせてループし続ける。
+- L348: 前のフレームからの経過時間。タブを裏に回していた後などに大きな値になると破片が吹っ飛ぶので、最大50msに抑える。
+- L350–353: 長押しの移動 → 演出のきっかけ → 終了の処理 → 上部の表示、の順に更新。
+- L354–366: 描画担当に「今描くもの」を渡して描いてもらう。メニュー中は飾りの盤面 `emptyField` を描く。
+- L367: `requestAnimationFrame(frame)` … 「次に画面を描き替えるタイミングで、もう一度 frame を呼んで」とブラウザに頼む。これで画面のリフレッシュレート（多くは60回/秒）に合わせてループし続ける。
 
-**L369–384**
+**L370–385**
 
 ```ts
-369 | // メニュー中に盤面に飾りとして並べる宝石
-370 | const emptyField = Field.fromRows([
-371 |   '......',
+370 | // メニュー中に盤面に飾りとして並べる宝石
+371 | const emptyField = Field.fromRows([
 372 |   '......',
 373 |   '......',
 374 |   '......',
 375 |   '......',
 376 |   '......',
 377 |   '......',
-378 |   '3.....',
-379 |   '20...1',
-380 |   '201.31',
-381 |   '120331',
-382 |   '112002',
-383 | ]);
-384 | 
+378 |   '......',
+379 |   '3.....',
+380 |   '20...1',
+381 |   '201.31',
+382 |   '120331',
+383 |   '112002',
+384 | ]);
+385 | 
 ```
 
 メニュー画面の背景に置く飾りの盤面。`Field.fromRows` に画面の見た目どおりの文字列で書いている。
@@ -713,19 +715,19 @@
 
 ## 画面の切り替え showOverlay
 
-**L385–394**
+**L386–395**
 
 ```ts
-385 | // ---------- オーバーレイ ----------
-386 | type OverlayName = 'menu' | 'options' | 'ranking' | 'result';
-387 | function showOverlay(name: OverlayName | null): void {
-388 |   ui.menu.hidden = name !== 'menu';
-389 |   ui.options.hidden = name !== 'options';
-390 |   ui.ranking.hidden = name !== 'ranking';
-391 |   ui.result.hidden = name !== 'result';
-392 |   if (name === 'menu') $('start').focus();
-393 | }
-394 | 
+386 | // ---------- オーバーレイ ----------
+387 | type OverlayName = 'menu' | 'options' | 'ranking' | 'result';
+388 | function showOverlay(name: OverlayName | null): void {
+389 |   ui.menu.hidden = name !== 'menu';
+390 |   ui.options.hidden = name !== 'options';
+391 |   ui.ranking.hidden = name !== 'ranking';
+392 |   ui.result.hidden = name !== 'result';
+393 |   if (name === 'menu') $('start').focus();
+394 | }
+395 | 
 ```
 
 メニュー・オプション・ランキング・結果のうち、指定したものだけを表示し、残りを隠す。`null` なら全部隠す（プレイ画面だけになる）。
@@ -733,93 +735,93 @@ HTML 要素の `hidden` を true にすると非表示になる。メニュー�
 
 ## 結果画面 showResult
 
-**L395–403**
+**L396–404**
 
 ```ts
-395 | function showResult(kind: 'cleared' | 'dead', elapsed: number, rank: number | null, prevBest?: number, prevSeedBest?: number): void {
-396 |   if (!game) return;
-397 |   mode = 'result';
-398 |   const kindEl = $('result-kind');
-399 |   kindEl.textContent = kind === 'cleared' ? (rank === 1 ? 'NEW RECORD' : 'CLEAR') : '窒息';
-400 |   kindEl.classList.toggle('dead', kind === 'dead');
-401 |   $('result-time').textContent = formatTime(elapsed);
-402 |   const delta = $('result-delta');
-403 |   delta.className = 'result-delta';
+396 | function showResult(kind: 'cleared' | 'dead', elapsed: number, rank: number | null, prevBest?: number, prevSeedBest?: number): void {
+397 |   if (!game) return;
+398 |   mode = 'result';
+399 |   const kindEl = $('result-kind');
+400 |   kindEl.textContent = kind === 'cleared' ? (rank === 1 ? 'NEW RECORD' : 'CLEAR') : '窒息';
+401 |   kindEl.classList.toggle('dead', kind === 'dead');
+402 |   $('result-time').textContent = formatTime(elapsed);
+403 |   const delta = $('result-delta');
+404 |   delta.className = 'result-delta';
 ```
 
 - 引数: 種類（クリア／窒息）、タイム、順位、これまでのベスト、このシードでのベスト。最後の2つは `?` 付きで省略可能。
-- L399: 見出し。1位なら「NEW RECORD」。
-- L400: `classList.toggle('dead', 条件)` … 条件が真ならクラスを付け、偽なら外す。窒息なら赤い見出しにする。
-- L403: 差分表示のクラスをいったんリセット。
+- L400: 見出し。1位なら「NEW RECORD」。
+- L401: `classList.toggle('dead', 条件)` … 条件が真ならクラスを付け、偽なら外す。窒息なら赤い見出しにする。
+- L404: 差分表示のクラスをいったんリセット。
 
-**L404–423**
+**L405–424**
 
 ```ts
-404 |   if (kind === 'cleared') {
-405 |     const parts: string[] = [];
-406 |     if (prevBest !== undefined) {
-407 |       const d = elapsed - prevBest;
-408 |       parts.push(`ベスト ${d <= 0 ? '−' : '+'}${formatTime(Math.abs(d))}`);
-409 |       delta.classList.add(d <= 0 ? 'better' : 'worse');
-410 |     } else {
-411 |       parts.push('初記録');
-412 |       delta.classList.add('better');
-413 |     }
-414 |     if (prevSeedBest !== undefined) {
-415 |       const d = elapsed - prevSeedBest;
-416 |       parts.push(`このシード ${d <= 0 ? '−' : '+'}${formatTime(Math.abs(d))}`);
-417 |     }
-418 |     if (rank) parts.push(`${rank}位`);
-419 |     delta.textContent = parts.join('　');
-420 |   } else {
-421 |     delta.textContent = game.canUndo() ? `1手戻すと +${CONFIG.UNDO_PENALTY_MS / 1000}秒で続行できます` : '記録なし';
-422 |     delta.classList.add('worse');
-423 |   }
+405 |   if (kind === 'cleared') {
+406 |     const parts: string[] = [];
+407 |     if (prevBest !== undefined) {
+408 |       const d = elapsed - prevBest;
+409 |       parts.push(`ベスト ${d <= 0 ? '−' : '+'}${formatTime(Math.abs(d))}`);
+410 |       delta.classList.add(d <= 0 ? 'better' : 'worse');
+411 |     } else {
+412 |       parts.push('初記録');
+413 |       delta.classList.add('better');
+414 |     }
+415 |     if (prevSeedBest !== undefined) {
+416 |       const d = elapsed - prevSeedBest;
+417 |       parts.push(`このシード ${d <= 0 ? '−' : '+'}${formatTime(Math.abs(d))}`);
+418 |     }
+419 |     if (rank) parts.push(`${rank}位`);
+420 |     delta.textContent = parts.join('　');
+421 |   } else {
+422 |     delta.textContent = game.canUndo() ? `1手戻すと +${CONFIG.UNDO_PENALTY_MS / 1000}秒で続行できます` : '記録なし';
+423 |     delta.classList.add('worse');
+424 |   }
 ```
 
 - クリアの場合: ベストとの差を「ベスト −0:01.23」の形で作る。速ければ（差が0以下）緑、遅ければ赤。初めての記録なら「初記録」。シード別ベストとの差、順位も並べて、全角スペースでつなぐ。
 - 窒息の場合: 1手戻せるなら「1手戻すと +5秒で続行できます」と案内する。
 
-**L424–433**
+**L425–434**
 
 ```ts
-424 |   $('result-target').textContent = fmt(target);
-425 |   $('result-score').textContent = fmt(game.score);
-426 |   $('result-seed').textContent = String(game.seed);
-427 |   $('result-chain').textContent = `${game.maxChain}連鎖`;
-428 |   $('result-moves').textContent = String(game.moves);
-429 |   $('result-undos').textContent = String(game.undos);
-430 |   showOverlay('result');
-431 |   $('retry').focus();
-432 | }
-433 | 
+425 |   $('result-target').textContent = fmt(target);
+426 |   $('result-score').textContent = fmt(game.score);
+427 |   $('result-seed').textContent = String(game.seed);
+428 |   $('result-chain').textContent = `${game.maxChain}連鎖`;
+429 |   $('result-moves').textContent = String(game.moves);
+430 |   $('result-undos').textContent = String(game.undos);
+431 |   showOverlay('result');
+432 |   $('retry').focus();
+433 | }
+434 | 
 ```
 
 目標点・スコア・シード・最大連鎖・手数・戻した回数を表示して、結果画面を開く。Enter ですぐリトライできるようリトライボタンにフォーカス。
 
 ## メニューの組み立て
 
-**L434–451**
+**L435–452**
 
 ```ts
-434 | // ---------- メニューの組み立て ----------
-435 | function renderTargets(): void {
-436 |   ui.targets.replaceChildren(
-437 |     ...CONFIG.TARGETS.map((t) => {
-438 |       const b = document.createElement('button');
-439 |       b.type = 'button';
-440 |       b.className = 'seg-btn';
-441 |       b.textContent = targetLabel(t);
-442 |       b.setAttribute('aria-pressed', String(t === target));
-443 |       b.addEventListener('click', () => {
-444 |         target = t;
-445 |         renderTargets();
-446 |       });
-447 |       return b;
-448 |     }),
-449 |   );
-450 | }
-451 | 
+435 | // ---------- メニューの組み立て ----------
+436 | function renderTargets(): void {
+437 |   ui.targets.replaceChildren(
+438 |     ...CONFIG.TARGETS.map((t) => {
+439 |       const b = document.createElement('button');
+440 |       b.type = 'button';
+441 |       b.className = 'seg-btn';
+442 |       b.textContent = targetLabel(t);
+443 |       b.setAttribute('aria-pressed', String(t === target));
+444 |       b.addEventListener('click', () => {
+445 |         target = t;
+446 |         renderTargets();
+447 |       });
+448 |       return b;
+449 |     }),
+450 |   );
+451 | }
+452 | 
 ```
 
 `renderTargets()` … 目標点のボタンを作り直す。
@@ -827,39 +829,39 @@ HTML 要素の `hidden` を true にすると非表示になる。メニュー�
 - 各目標点についてボタンを作り（`document.createElement('button')`）、選ばれているものには `aria-pressed="true"` を付ける。CSS はこの属性を見て金色の「選択中」の見た目にする。`aria-pressed` は読み上げソフトにも「押されている」と伝わる。
 - クリックされたら、その目標点を選んで作り直す。
 
-**L452–459**
+**L453–460**
 
 ```ts
-452 | function setSeedMode(m: 'random' | 'fixed'): void {
-453 |   seedMode = m;
-454 |   ui.seedRandom.setAttribute('aria-pressed', String(m === 'random'));
-455 |   ui.seedFixed.setAttribute('aria-pressed', String(m === 'fixed'));
-456 |   ui.seedInput.disabled = m === 'random';
-457 |   if (m === 'fixed') ui.seedInput.focus();
-458 | }
-459 | 
+453 | function setSeedMode(m: 'random' | 'fixed'): void {
+454 |   seedMode = m;
+455 |   ui.seedRandom.setAttribute('aria-pressed', String(m === 'random'));
+456 |   ui.seedFixed.setAttribute('aria-pressed', String(m === 'fixed'));
+457 |   ui.seedInput.disabled = m === 'random';
+458 |   if (m === 'fixed') ui.seedInput.focus();
+459 | }
+460 | 
 ```
 
 `setSeedMode(m)` … シードの選び方を切り替える。ランダムなら番号の入力欄を無効にし、番号指定なら入力欄にカーソルを移す。
 
-**L460–474**
+**L461–475**
 
 ```ts
-460 | function renderHowto(): void {
-461 |   const arrow =
-462 |     '<b>キーボード</b>　<kbd>←</kbd><kbd>→</kbd> 移動　<kbd>Z</kbd><kbd>X</kbd> 回転　<kbd>↓</kbd>/<kbd>↑</kbd> 設置';
-463 |   const direct =
-464 |     '<b>キーボード</b>　<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 子ぷよの向き　<kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>;</kbd><kbd>\'</kbd> その列に設置';
-465 |   const touch =
-466 |     options.touchScheme === 'twohand'
-467 |       ? '<b>タッチ（両手）</b>　左半分を横にスワイプで列、右半分をフリックで子ぷよの向き。右を先に離すと設置、左を先に離すと取り消し'
-468 |       : '<b>タッチ</b>　列をタップで縦置き、フリックで子ぷよの向き。盤面の外まで引っぱるか2本目の指でタップすると取り消し（マウスは右クリック）';
-469 |   const common = `${touch}<br><kbd>Q</kbd> 1手戻す(+5秒)　<kbd>R</kbd> リトライ　<kbd>N</kbd> 新しいシード　<kbd>Esc</kbd> メニュー`;
-470 |   const key = options.controlScheme === 'arrow' ? arrow : direct;
-471 |   ui.howto.innerHTML = `${key}<br>${common}`;
-472 |   ui.keyhelp.innerHTML = `${key.replace('<b>キーボード</b>　', '')}<br><kbd>Q</kbd>/<kbd>BS</kbd> 1手戻す(+5秒)<br><kbd>R</kbd> リトライ　<kbd>N</kbd> 新シード<br><kbd>Esc</kbd> メニュー`;
-473 | }
-474 | 
+461 | function renderHowto(): void {
+462 |   const arrow =
+463 |     '<b>キーボード</b>　<kbd>←</kbd><kbd>→</kbd> 移動　<kbd>Z</kbd><kbd>X</kbd> 回転　<kbd>↓</kbd>/<kbd>↑</kbd> 設置';
+464 |   const direct =
+465 |     '<b>キーボード</b>　<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 子ぷよの向き　<kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>;</kbd><kbd>\'</kbd> その列に設置';
+466 |   const touch =
+467 |     options.touchScheme === 'twohand'
+468 |       ? '<b>タッチ（両手）</b>　左半分を横にスワイプで列、右半分をフリックで子ぷよの向き。右を先に離すと設置、左を先に離すと取り消し'
+469 |       : '<b>タッチ</b>　列をタップで縦置き、フリックで子ぷよの向き。盤面の外まで引っぱるか2本目の指でタップすると取り消し（マウスは右クリック）';
+470 |   const common = `${touch}<br><kbd>Q</kbd> 1手戻す(+5秒)　<kbd>R</kbd> リトライ　<kbd>N</kbd> 新しいシード　<kbd>Esc</kbd> メニュー`;
+471 |   const key = options.controlScheme === 'arrow' ? arrow : direct;
+472 |   ui.howto.innerHTML = `${key}<br>${common}`;
+473 |   ui.keyhelp.innerHTML = `${key.replace('<b>キーボード</b>　', '')}<br><kbd>Q</kbd>/<kbd>BS</kbd> 1手戻す(+5秒)<br><kbd>R</kbd> リトライ　<kbd>N</kbd> 新シード<br><kbd>Esc</kbd> メニュー`;
+474 | }
+475 | 
 ```
 
 `renderHowto()` … 遊び方の説明文を、今の操作方式に合わせて作る。メニュー画面用（`howto`）と、PCのプレイ画面右側用（`keyhelp`）の2か所。`<kbd>` はキーボードのキーを表す HTML の要素で、CSS でキーっぽい見た目にしている。
@@ -868,195 +870,202 @@ HTML 要素の `hidden` を true にすると非表示になる。メニュー�
 
 ## オプションの反映 applyOptions
 
-**L475–505**
+**L476–509**
 
 ```ts
-475 | function applyOptions(): void {
-476 |   keyboard.scheme = options.controlScheme;
-477 |   pointer.threshold = options.flickThreshold;
-478 |   pointer.enabled = options.touchScheme === 'single';
-479 |   twoHand.enabled = options.touchScheme === 'twohand';
-480 |   twoHand.threshold = options.flickThreshold;
-481 |   twoHand.columnStep = options.columnStep;
-482 |   sound.setVolume(options.sfxVolume);
-483 |   for (const b of $('opt-scheme').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
-484 |     b.setAttribute('aria-pressed', String(b.dataset.value === options.controlScheme));
-485 |   }
-486 |   for (const b of $('opt-spawn').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
-487 |     b.setAttribute('aria-pressed', String(b.dataset.value === options.spawnMode));
-488 |   }
-489 |   for (const b of $('opt-touch').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
-490 |     b.setAttribute('aria-pressed', String(b.dataset.value === options.touchScheme));
-491 |   }
-492 |   const step = $<HTMLInputElement>('opt-step');
-493 |   step.value = String(options.columnStep);
-494 |   $('opt-step-out').textContent = `${options.columnStep}px`;
-495 |   $('opt-step-group').hidden = options.touchScheme !== 'twohand';
-496 |   const flick = $<HTMLInputElement>('opt-flick');
-497 |   flick.value = String(options.flickThreshold);
-498 |   $('opt-flick-out').textContent = `${options.flickThreshold}px`;
-499 |   const vol = $<HTMLInputElement>('opt-volume');
-500 |   vol.value = String(options.sfxVolume);
-501 |   $('opt-volume-out').textContent = `${Math.round(options.sfxVolume * 100)}%`;
-502 |   renderHowto();
-503 |   saveOptions(options);
-504 | }
-505 | 
+476 | function applyOptions(): void {
+477 |   keyboard.scheme = options.controlScheme;
+478 |   pointer.threshold = options.flickThreshold;
+479 |   pointer.enabled = options.touchScheme === 'single';
+480 |   twoHand.enabled = options.touchScheme === 'twohand';
+481 |   twoHand.threshold = options.flickThreshold;
+482 |   twoHand.columnStep = options.columnStep;
+483 |   sound.setVolume(options.sfxVolume);
+484 |   for (const b of $('opt-scheme').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+485 |     b.setAttribute('aria-pressed', String(b.dataset.value === options.controlScheme));
+486 |   }
+487 |   for (const b of $('opt-spawn-col').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+488 |     b.setAttribute('aria-pressed', String(b.dataset.value === options.spawnCol));
+489 |   }
+490 |   for (const b of $('opt-spawn-rot').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+491 |     b.setAttribute('aria-pressed', String(b.dataset.value === options.spawnRot));
+492 |   }
+493 |   for (const b of $('opt-touch').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+494 |     b.setAttribute('aria-pressed', String(b.dataset.value === options.touchScheme));
+495 |   }
+496 |   const step = $<HTMLInputElement>('opt-step');
+497 |   step.value = String(options.columnStep);
+498 |   $('opt-step-out').textContent = `${options.columnStep}px`;
+499 |   $('opt-step-group').hidden = options.touchScheme !== 'twohand';
+500 |   const flick = $<HTMLInputElement>('opt-flick');
+501 |   flick.value = String(options.flickThreshold);
+502 |   $('opt-flick-out').textContent = `${options.flickThreshold}px`;
+503 |   const vol = $<HTMLInputElement>('opt-volume');
+504 |   vol.value = String(options.sfxVolume);
+505 |   $('opt-volume-out').textContent = `${Math.round(options.sfxVolume * 100)}%`;
+506 |   renderHowto();
+507 |   saveOptions(options);
+508 | }
+509 | 
 ```
 
 オプションが変わるたびに呼ぶ。
-- L476–482: 入力・音に設定を反映。タッチは片手（`pointer`）と両手（`twoHand`）のどちらか一方だけを `enabled` にする。
-- L483–491: 操作方式・開始位置・タッチ操作のボタンの選択状態を更新。`querySelectorAll('.seg-btn')` でその中のボタンを全部取り、`data-value` 属性（HTML の `data-value="arrow"`。JavaScript からは `dataset.value`）と比べる。
-- L492–501: スライダーの位置と、横の数値表示を更新。「1列動かす距離」のスライダーは両手モードのときだけ表示する（`hidden`）。
-- L502–503: 説明文を作り直して、設定を保存。
+- L477–483: 入力・音に設定を反映。タッチは片手（`pointer`）と両手（`twoHand`）のどちらか一方だけを `enabled` にする。
+- L484–495: 操作方式・次のペアの列・子ぷよの向き・タッチ操作のボタンの選択状態を更新。`querySelectorAll('.seg-btn')` でその中のボタンを全部取り、`data-value` 属性（HTML の `data-value="arrow"`。JavaScript からは `dataset.value`）と比べる。
+- L496–505: スライダーの位置と、横の数値表示を更新。「1列動かす距離」のスライダーは両手モードのときだけ表示する（`hidden`）。
+- L506–507: 説明文を作り直して、設定を保存。
 
 
 ## ランキング画面 renderRanking
 
-**L506–522**
+**L510–526**
 
 ```ts
-506 | function renderRanking(): void {
-507 |   ui.rankTabs.replaceChildren(
-508 |     ...CONFIG.TARGETS.map((t) => {
-509 |       const b = document.createElement('button');
-510 |       b.type = 'button';
-511 |       b.className = 'seg-btn';
-512 |       b.textContent = targetLabel(t);
-513 |       b.setAttribute('aria-pressed', String(t === rankTarget));
-514 |       b.addEventListener('click', () => {
-515 |         rankTarget = t;
-516 |         renderRanking();
-517 |       });
-518 |       return b;
-519 |     }),
-520 |   );
-521 |   ui.rankNote.hidden = configSignature() === 'default';
-522 |   const list = getRanking(rankTarget);
+510 | function renderRanking(): void {
+511 |   ui.rankTabs.replaceChildren(
+512 |     ...CONFIG.TARGETS.map((t) => {
+513 |       const b = document.createElement('button');
+514 |       b.type = 'button';
+515 |       b.className = 'seg-btn';
+516 |       b.textContent = targetLabel(t);
+517 |       b.setAttribute('aria-pressed', String(t === rankTarget));
+518 |       b.addEventListener('click', () => {
+519 |         rankTarget = t;
+520 |         renderRanking();
+521 |       });
+522 |       return b;
+523 |     }),
+524 |   );
+525 |   ui.rankNote.hidden = configSignature() === 'default';
+526 |   const list = getRanking(rankTarget);
 ```
 
-- L507–520: 目標点のタブを作る（目標点ボタンと同じ作り方）。
-- L521: 設定定数を変えているなら「別枠の記録です」という注意を出す。
-- L522: その目標点の記録を読み込む。
+- L511–524: 目標点のタブを作る（目標点ボタンと同じ作り方）。
+- L525: 設定定数を変えているなら「別枠の記録です」という注意を出す。
+- L526: その目標点の記録を読み込む。
 
-**L523–550**
+**L527–554**
 
 ```ts
-523 |   if (list.length === 0) {
-524 |     ui.rankBody.innerHTML = '<tr><td class="empty" colspan="7">まだ記録がありません。最初の1本を走ろう。</td></tr>';
-525 |     return;
-526 |   }
-527 |   ui.rankBody.replaceChildren(
-528 |     ...list.map((r, i) => {
-529 |       const tr = document.createElement('tr');
-530 |       if (i === 0) tr.className = 'top';
-531 |       const d = new Date(r.date);
-532 |       const cells = [
-533 |         String(i + 1),
-534 |         formatTime(r.timeMs),
-535 |         String(r.seed),
-536 |         `${r.maxChain}`,
-537 |         String(r.moves),
-538 |         String(r.undos ?? 0),
-539 |         `${d.getMonth() + 1}/${d.getDate()}`,
-540 |       ];
-541 |       for (const c of cells) {
-542 |         const td = document.createElement('td');
-543 |         td.textContent = c;
-544 |         tr.append(td);
-545 |       }
-546 |       return tr;
-547 |     }),
-548 |   );
-549 | }
-550 | 
+527 |   if (list.length === 0) {
+528 |     ui.rankBody.innerHTML = '<tr><td class="empty" colspan="7">まだ記録がありません。最初の1本を走ろう。</td></tr>';
+529 |     return;
+530 |   }
+531 |   ui.rankBody.replaceChildren(
+532 |     ...list.map((r, i) => {
+533 |       const tr = document.createElement('tr');
+534 |       if (i === 0) tr.className = 'top';
+535 |       const d = new Date(r.date);
+536 |       const cells = [
+537 |         String(i + 1),
+538 |         formatTime(r.timeMs),
+539 |         String(r.seed),
+540 |         `${r.maxChain}`,
+541 |         String(r.moves),
+542 |         String(r.undos ?? 0),
+543 |         `${d.getMonth() + 1}/${d.getDate()}`,
+544 |       ];
+545 |       for (const c of cells) {
+546 |         const td = document.createElement('td');
+547 |         td.textContent = c;
+548 |         tr.append(td);
+549 |       }
+550 |       return tr;
+551 |     }),
+552 |   );
+553 | }
+554 | 
 ```
 
-- L523–526: 記録がなければ「まだ記録がありません」の行だけ出す。`innerHTML` は HTML の文字列で中身を書き換える。
-- L527–548: 記録1件ごとに表の行（`tr`）を作る。1位の行には `top` クラスを付けて金色にする。
-- L531: 保存していた日時の文字列から日付を作る。
-- L532–540: 各列の文字。`r.undos ?? 0` は、1手戻す機能を入れる前の記録（`undos` がない）なら0と表示。`getMonth()` は0始まり（1月が0）なので1を足す。
-- L541–545: セル（`td`）を作って行に追加。`textContent` で入れると、文字列が HTML として解釈されないので安全。
+- L527–530: 記録がなければ「まだ記録がありません」の行だけ出す。`innerHTML` は HTML の文字列で中身を書き換える。
+- L531–552: 記録1件ごとに表の行（`tr`）を作る。1位の行には `top` クラスを付けて金色にする。
+- L535: 保存していた日時の文字列から日付を作る。
+- L536–544: 各列の文字。`r.undos ?? 0` は、1手戻す機能を入れる前の記録（`undos` がない）なら0と表示。`getMonth()` は0始まり（1月が0）なので1を足す。
+- L545–549: セル（`td`）を作って行に追加。`textContent` で入れると、文字列が HTML として解釈されないので安全。
 
 ## ボタンなどのイベント
 
-**L551–568**
+**L555–572**
 
 ```ts
-551 | // ---------- イベント ----------
-552 | ui.seedRandom.addEventListener('click', () => setSeedMode('random'));
-553 | ui.seedFixed.addEventListener('click', () => setSeedMode('fixed'));
-554 | $('start').addEventListener('click', () => startGame(chosenSeed()));
-555 | $('open-options').addEventListener('click', () => showOverlay('options'));
-556 | $('close-options').addEventListener('click', () => showOverlay('menu'));
-557 | $('open-ranking').addEventListener('click', () => {
-558 |   rankTarget = target;
-559 |   renderRanking();
-560 |   showOverlay('ranking');
-561 | });
-562 | $('close-ranking').addEventListener('click', () => showOverlay('menu'));
-563 | $('retry').addEventListener('click', () => handlers.retry());
-564 | $('new-seed').addEventListener('click', () => handlers.newSeed());
-565 | $('to-menu').addEventListener('click', goMenu);
-566 | ui.undo.addEventListener('click', undo);
-567 | ui.resultUndo.addEventListener('click', undo);
-568 | 
+555 | // ---------- イベント ----------
+556 | ui.seedRandom.addEventListener('click', () => setSeedMode('random'));
+557 | ui.seedFixed.addEventListener('click', () => setSeedMode('fixed'));
+558 | $('start').addEventListener('click', () => startGame(chosenSeed()));
+559 | $('open-options').addEventListener('click', () => showOverlay('options'));
+560 | $('close-options').addEventListener('click', () => showOverlay('menu'));
+561 | $('open-ranking').addEventListener('click', () => {
+562 |   rankTarget = target;
+563 |   renderRanking();
+564 |   showOverlay('ranking');
+565 | });
+566 | $('close-ranking').addEventListener('click', () => showOverlay('menu'));
+567 | $('retry').addEventListener('click', () => handlers.retry());
+568 | $('new-seed').addEventListener('click', () => handlers.newSeed());
+569 | $('to-menu').addEventListener('click', goMenu);
+570 | ui.undo.addEventListener('click', undo);
+571 | ui.resultUndo.addEventListener('click', undo);
+572 | 
 ```
 
 各ボタンが押されたときの処理を登録する。`addEventListener('click', 関数)`。
 
-**L569–580**
+**L573–590**
 
 ```ts
-569 | for (const b of $('opt-scheme').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
-570 |   b.addEventListener('click', () => {
-571 |     options = { ...options, controlScheme: b.dataset.value as Options['controlScheme'] };
-572 |     applyOptions();
-573 |   });
-574 | }
-575 | for (const b of $('opt-spawn').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
-576 |   b.addEventListener('click', () => {
-577 |     options = { ...options, spawnMode: b.dataset.value as Options['spawnMode'] };
-578 |     applyOptions();
-579 |   });
-580 | }
+573 | for (const b of $('opt-scheme').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+574 |   b.addEventListener('click', () => {
+575 |     options = { ...options, controlScheme: b.dataset.value as Options['controlScheme'] };
+576 |     applyOptions();
+577 |   });
+578 | }
+579 | for (const b of $('opt-spawn-col').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+580 |   b.addEventListener('click', () => {
+581 |     options = { ...options, spawnCol: b.dataset.value as Options['spawnCol'] };
+582 |     applyOptions();
+583 |   });
+584 | }
+585 | for (const b of $('opt-spawn-rot').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+586 |   b.addEventListener('click', () => {
+587 |     options = { ...options, spawnRot: b.dataset.value as Options['spawnRot'] };
+588 |     applyOptions();
+589 |   });
+590 | }
 ```
 
-オプションの操作方式・開始位置のボタン。押されたら、そのボタンの値で設定を更新して反映する。
-`{ ...options, controlScheme: ... }` は「options をコピーして、controlScheme だけ変えた新しいオブジェクト」。
-`as Options['controlScheme']` は「この文字列は操作方式の型だ」という指定（`dataset.value` は普通の文字列型なので）。
+オプションの操作方式・次のペアの列・子ぷよの向きのボタン。押されたら、そのボタンの値で設定を更新して反映する。
 
-
-**L581–590**
-
-```ts
-581 | for (const b of $('opt-touch').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
-582 |   b.addEventListener('click', () => {
-583 |     options = { ...options, touchScheme: b.dataset.value as Options['touchScheme'] };
-584 |     applyOptions();
-585 |   });
-586 | }
-587 | $<HTMLInputElement>('opt-step').addEventListener('input', (e) => {
-588 |   options = { ...options, columnStep: Number((e.target as HTMLInputElement).value) };
-589 |   applyOptions();
-590 | });
-```
-
-タッチ操作（片手／両手）のボタンと、両手モードで1列動かす距離のスライダー。作り方は上と同じ。
 
 **L591–600**
 
 ```ts
-591 | $<HTMLInputElement>('opt-flick').addEventListener('input', (e) => {
-592 |   options = { ...options, flickThreshold: Number((e.target as HTMLInputElement).value) };
-593 |   applyOptions();
-594 | });
-595 | $<HTMLInputElement>('opt-volume').addEventListener('input', (e) => {
-596 |   options = { ...options, sfxVolume: Number((e.target as HTMLInputElement).value) };
-597 |   applyOptions();
-598 |   sound.unlock();
-599 |   sound.pop(3);
+591 | for (const b of $('opt-touch').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
+592 |   b.addEventListener('click', () => {
+593 |     options = { ...options, touchScheme: b.dataset.value as Options['touchScheme'] };
+594 |     applyOptions();
+595 |   });
+596 | }
+597 | $<HTMLInputElement>('opt-step').addEventListener('input', (e) => {
+598 |   options = { ...options, columnStep: Number((e.target as HTMLInputElement).value) };
+599 |   applyOptions();
 600 | });
+```
+
+タッチ操作（片手／両手）のボタンと、両手モードで1列動かす距離のスライダー。作り方は上と同じ。
+
+**L601–610**
+
+```ts
+601 | $<HTMLInputElement>('opt-flick').addEventListener('input', (e) => {
+602 |   options = { ...options, flickThreshold: Number((e.target as HTMLInputElement).value) };
+603 |   applyOptions();
+604 | });
+605 | $<HTMLInputElement>('opt-volume').addEventListener('input', (e) => {
+606 |   options = { ...options, sfxVolume: Number((e.target as HTMLInputElement).value) };
+607 |   applyOptions();
+608 |   sound.unlock();
+609 |   sound.pop(3);
+610 | });
 ```
 
 スライダー。`input` イベントは、つまみを動かしている最中にも何度も届く。
@@ -1064,49 +1073,49 @@ HTML 要素の `hidden` を true にすると非表示になる。メニュー�
 
 ## 記録の全削除（2回押し）
 
-**L601–616**
+**L611–626**
 
 ```ts
-601 | const clearBtn = $<HTMLButtonElement>('clear-records');
-602 | clearBtn.addEventListener('click', () => {
-603 |   if (clearBtn.dataset.armed === 'true') {
-604 |     clearRecords();
-605 |     clearBtn.dataset.armed = 'false';
-606 |     clearBtn.textContent = '削除しました';
-607 |     return;
-608 |   }
-609 |   clearBtn.dataset.armed = 'true';
-610 |   clearBtn.textContent = 'もう一度押すと削除';
-611 |   window.setTimeout(() => {
-612 |     clearBtn.dataset.armed = 'false';
-613 |     clearBtn.textContent = '記録をすべて削除';
-614 |   }, 3000);
-615 | });
-616 | 
+611 | const clearBtn = $<HTMLButtonElement>('clear-records');
+612 | clearBtn.addEventListener('click', () => {
+613 |   if (clearBtn.dataset.armed === 'true') {
+614 |     clearRecords();
+615 |     clearBtn.dataset.armed = 'false';
+616 |     clearBtn.textContent = '削除しました';
+617 |     return;
+618 |   }
+619 |   clearBtn.dataset.armed = 'true';
+620 |   clearBtn.textContent = 'もう一度押すと削除';
+621 |   window.setTimeout(() => {
+622 |     clearBtn.dataset.armed = 'false';
+623 |     clearBtn.textContent = '記録をすべて削除';
+624 |   }, 3000);
+625 | });
+626 | 
 ```
 
 うっかり消さないよう、1回目は「もう一度押すと削除」に変わるだけ。3秒以内にもう一度押すと削除する。
 `dataset.armed` は HTML の `data-armed` 属性。押せる状態かどうかを要素自体に覚えさせ、CSS でも見た目を変えている。
 
-**L617–618**
+**L627–628**
 
 ```ts
-617 | new ResizeObserver(() => renderer.resize()).observe($('stage'));
-618 | 
+627 | new ResizeObserver(() => renderer.resize()).observe($('stage'));
+628 | 
 ```
 
 `ResizeObserver` … 指定した要素の大きさが変わったら知らせてくれる仕組み。盤面のエリアの大きさが変わるたびにレイアウトを計算し直す。
 
 ## 起動
 
-**L619–623**
+**L629–633**
 
 ```ts
-619 | // ---------- 起動 ----------
-620 | renderTargets();
-621 | applyOptions();
-622 | showOverlay('menu');
-623 | requestAnimationFrame(frame);
+629 | // ---------- 起動 ----------
+630 | renderTargets();
+631 | applyOptions();
+632 | showOverlay('menu');
+633 | requestAnimationFrame(frame);
 ```
 
 ページを開いたときに1回だけ実行される部分。目標点のボタンを作り、オプションを反映し、メニューを開き、メインループを始める。

@@ -232,9 +232,10 @@ function flickRotation(dx: number, dy: number, threshold: number): Rotation | nu
 
 /**
  * 両手モード（タッチ）: 画面の左半分で列、右半分で子ぷよの向きを決める。
- * - 左の指: 横にスワイプした距離で列を動かす（columnStep px で1列）
+ * - 左の指: 横にスワイプした距離で列を動かす（columnStep px で1列）。置いた後も押したままにすれば、次のペアもその指で列を決められる
  * - 右の指: フリック方向＝子ぷよの向き。フリックしなければ指を置いたときの向きのまま
- * - 右を先に離すと設置、左を先に離すとキャンセル。右だけで操作したときは今の列に置く
+ * - 右を離すと設置。左を先に離すとキャンセル（列と向きを操作の前に戻す）
+ * - 右だけで操作したときは今の列に置く。左だけで操作して離したときは、その列のまま
  */
 export class TwoHand {
   enabled = false;
@@ -242,7 +243,9 @@ export class TwoHand {
   columnStep = 32;
   private left: { id: number; x0: number; col0: number; col: number } | null = null;
   private right: { id: number; x0: number; y0: number; rot0: Rotation; rot: Rotation } | null = null;
-  /** 設置・キャンセル後もまだ触れている指（離したときに何もしないよう覚えておく） */
+  /** 今の操作を始める前の列と向き（キャンセルで戻す先）。操作中でなければ null */
+  private origin: { col: number; rot: Rotation } | null = null;
+  /** キャンセル後もまだ触れている指（離したときに何もしないよう覚えておく） */
   private ignored = new Set<number>();
 
   constructor(
@@ -260,13 +263,15 @@ export class TwoHand {
     e.preventDefault();
     const rect = this.canvas.getBoundingClientRect();
     const isLeft = e.clientX < rect.left + rect.width / 2;
-    // 同じ側に2本目の指が来た・操作できない間に触れた指は無視する
-    if ((isLeft ? this.left : this.right) || !this.h.canControl()) {
+    // 同じ側に2本目の指が来たら無視する
+    if (isLeft ? this.left : this.right) {
       this.ignored.add(e.pointerId);
       return;
     }
     this.canvas.setPointerCapture(e.pointerId);
     const cur = this.h.cursor();
+    // 連鎖の演出中でも指を置いて列・向きを準備できる（置くのは操作できるようになってから）
+    this.origin ??= { ...cur };
     if (isLeft) this.left = { id: e.pointerId, x0: e.clientX, col0: cur.col, col: cur.col };
     else this.right = { id: e.pointerId, x0: e.clientX, y0: e.clientY, rot0: cur.rot, rot: cur.rot };
     this.show();
@@ -291,22 +296,30 @@ export class TwoHand {
     const l = this.left;
     const r = this.right;
     if (r && r.id === e.pointerId) {
+      // 右を離した＝置く。左の指はそのまま次のペアの列決めに使い続ける
       const { col, rot } = this.state();
-      this.release(e.pointerId);
+      this.right = null;
+      this.origin = null;
       if (commit && this.h.canControl()) this.h.pointerPlace(col, rot);
+      if (this.left) {
+        // 次のペアの開始位置（キャンセルで戻す先）を覚えてから、左の指の列に合わせる
+        this.origin = this.h.cursor();
+        this.show();
+      }
     } else if (l && l.id === e.pointerId) {
-      // 左を先に離した＝キャンセル。列は指を置く前に戻す
-      this.h.preview(l.col0, r ? r.rot0 : this.h.cursor().rot, false);
-      this.release(e.pointerId);
-      if (r) this.h.cancelled();
+      this.left = null;
+      if (r) {
+        // 左を先に離した＝キャンセル。右の指は離すまで無視する
+        const back = this.origin ?? this.h.cursor();
+        this.ignored.add(r.id);
+        this.right = null;
+        this.origin = null;
+        this.h.preview(back.col, back.rot, false);
+        this.h.cancelled();
+      } else {
+        this.origin = null;
+      }
     }
-  }
-
-  /** 操作を終える。離した指以外でまだ触れている指は、離すまで無視する */
-  private release(liftedId: number): void {
-    for (const f of [this.left, this.right]) if (f && f.id !== liftedId) this.ignored.add(f.id);
-    this.left = null;
-    this.right = null;
   }
 
   private state(): { col: number; rot: Rotation } {
