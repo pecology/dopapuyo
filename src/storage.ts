@@ -2,8 +2,8 @@ import { configSignature } from './config';
 
 export type ControlScheme = 'arrow' | 'direct';
 export type SpawnMode = 'reset' | 'keep';
-/** タッチ操作: 片手（タップ列＋フリック）／両手（左で列・右で向き） */
-export type TouchScheme = 'single' | 'twohand';
+/** タッチ操作: 片手（タップ列＋フリック）／両手（左で列・右で向き）／ボタン（置き方22パターンのボタン） */
+export type TouchScheme = 'single' | 'twohand' | 'buttons';
 
 export interface Options {
   controlScheme: ControlScheme;

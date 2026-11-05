@@ -45,8 +45,8 @@ body {
 #app {
   height: 100%;
   display: grid;
-  grid-template-rows: auto 1fr;
-  grid-template-areas: 'hud' 'stage';
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'hud' 'stage' 'pad';
   padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px)
     max(8px, env(safe-area-inset-left, 0px));
 }
@@ -169,9 +169,9 @@ body {
 /* PC: 盤面を中央に、横に情報 */
 @media (min-width: 820px) and (min-aspect-ratio: 1/1) {
   #app {
-    grid-template-rows: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
     grid-template-columns: minmax(200px, 280px) minmax(0, 1fr) minmax(200px, 280px);
-    grid-template-areas: '. stage hud';
+    grid-template-areas: '. stage hud' '. pad hud';
   }
   .hud {
     grid-template-columns: 1fr;
@@ -649,4 +649,67 @@ input[type='range'] {
 
 .undo-btn:not(:disabled):active {
   transform: translateY(1px);
+}
+
+/* ---------- ボタン方式のタッチ操作（置き方22パターン） ---------- */
+.pad {
+  grid-area: pad;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 6px 0 8px;
+  display: grid;
+  gap: 5px;
+  touch-action: none;
+}
+
+/* 半列刻みの12マス。縦置きは2マス、横置きは境目をまたいで2マス使う */
+.pad-row {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pad-btn {
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gold-dim);
+  border-radius: 9px;
+  background: rgba(30, 26, 54, 0.85);
+  cursor: pointer;
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+.pad-btn.v {
+  flex-direction: column;
+}
+
+.pad-gem {
+  width: 18px;
+  height: 18px;
+  background: center / contain no-repeat;
+}
+
+/* 軸ぷよの目印 */
+.pad-gem.axis {
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+}
+
+/* 同じ色のペアで、結果が他のボタンと同じになるもの */
+.pad-btn.dup {
+  opacity: 0.4;
+}
+
+.pad-btn.active {
+  border-color: var(--gold);
+  background: rgba(214, 190, 140, 0.28);
+}
+
+.pad.disabled .pad-btn:not(.active) {
+  opacity: 0.55;
 }

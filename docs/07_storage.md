@@ -17,14 +17,14 @@ localStorage はブラウザがサイトごとに用意してくれる小さな�
 ```ts
   3 | export type ControlScheme = 'arrow' | 'direct';
   4 | export type SpawnMode = 'reset' | 'keep';
-  5 | /** タッチ操作: 片手（タップ列＋フリック）／両手（左で列・右で向き） */
-  6 | export type TouchScheme = 'single' | 'twohand';
+  5 | /** タッチ操作: 片手（タップ列＋フリック）／両手（左で列・右で向き）／ボタン（置き方22パターンのボタン） */
+  6 | export type TouchScheme = 'single' | 'twohand' | 'buttons';
   7 | 
 ```
 
 - `ControlScheme` … キーボード操作の方式。`'arrow'`（矢印キー）か `'direct'`（直接指定）。
 - `SpawnMode` … 置いた後の次ペアの開始位置を戻すか引き継ぐか。`'reset'`（戻す）か `'keep'`（引き継ぐ）。列と向きで別々に使う。
-- `TouchScheme` … タッチ操作の方式。`'single'`（片手: タップした列＋フリック）か `'twohand'`（両手: 左半分で列・右半分で向き）。
+- `TouchScheme` … タッチ操作の方式。`'single'`（片手: タップした列＋フリック）、`'twohand'`（両手: 左半分で列・右半分で向き）、`'buttons'`（ボタン: 置き方22パターンのボタン）。
 
 文字列リテラルのユニオン型にしておくと、`'arow'` のような打ち間違いを TypeScript が見つけてくれる。
 

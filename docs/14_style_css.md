@@ -102,8 +102,8 @@ CSS の基本の形は `セレクタ { プロパティ: 値; }`。
  45 | #app {
  46 |   height: 100%;
  47 |   display: grid;
- 48 |   grid-template-rows: auto 1fr;
- 49 |   grid-template-areas: 'hud' 'stage';
+ 48 |   grid-template-rows: auto minmax(0, 1fr) auto;
+ 49 |   grid-template-areas: 'hud' 'stage' 'pad';
  50 |   padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px)
  51 |     max(8px, env(safe-area-inset-left, 0px));
  52 | }
@@ -111,8 +111,8 @@ CSS の基本の形は `セレクタ { プロパティ: 値; }`。
 ```
 
 `#app` を **CSS Grid**（格子状の配置）にする。
-- `grid-template-rows: auto 1fr` … 1段目は中身の高さ、2段目は残り全部。
-- `grid-template-areas: 'hud' 'stage'` … 1段目に `hud`（上部の表示）、2段目に `stage`（盤面）という名前の領域を置く。
+- `grid-template-rows: auto minmax(0, 1fr) auto` … 1段目は中身の高さ、2段目は残り全部、3段目は中身の高さ。`minmax(0, 1fr)` は「残り全部、ただし中身が大きくても縮んでよい」。
+- `grid-template-areas: 'hud' 'stage' 'pad'` … 1段目に `hud`（上部の表示）、2段目に `stage`（盤面）、3段目に `pad`（ボタン方式のボタン）という名前の領域を置く。ボタン方式でないときは `pad` が隠れているので、3段目の高さは0になる。
 - `padding: env(safe-area-inset-...)` … iPhone のノッチやホームバーに隠れないよう、端末が教えてくれる安全な余白（セーフエリア）を確保する。`max(8px, ...)` で左右は最低8px。
 
 **L54–59**
@@ -318,9 +318,9 @@ HUD は Heads-Up Display（ゲーム画面に重ねて出す情報）の略。
 169 | /* PC: 盤面を中央に、横に情報 */
 170 | @media (min-width: 820px) and (min-aspect-ratio: 1/1) {
 171 |   #app {
-172 |     grid-template-rows: 1fr;
+172 |     grid-template-rows: minmax(0, 1fr) auto;
 173 |     grid-template-columns: minmax(200px, 280px) minmax(0, 1fr) minmax(200px, 280px);
-174 |     grid-template-areas: '. stage hud';
+174 |     grid-template-areas: '. stage hud' '. pad hud';
 175 |   }
 176 |   .hud {
 177 |     grid-template-columns: 1fr;
@@ -336,7 +336,7 @@ HUD は Heads-Up Display（ゲーム画面に重ねて出す情報）の略。
 ```
 
 `@media (条件) { ... }` … 条件に合うときだけ中の指定が効く（**メディアクエリ**）。ここでは「幅820px以上、かつ横長（縦横比1:1以上）」のとき。
-- `#app` を3列にし、真ん中に盤面、右に HUD、左は空き（`.`）にする。左右を同じ幅にすることで盤面が画面の中央に来る。
+- `#app` を3列2段にし、真ん中の列の上に盤面、その下にボタン方式のボタン、右の列に HUD、左は空き（`.`）にする。左右を同じ幅にすることで盤面が画面の中央に来る。
 - `.hud` を縦1列にして、上下中央に寄せる。
 - `.hud > *` … HUD の直接の子要素すべて。スマホ用に付けた領域名の指定を解除して、上から順に並べる。
 
@@ -971,3 +971,136 @@ PC のときの見た目の調整。
 - `flex-direction: column` … 「1手戻す」と「+5秒」を縦に並べる。
 - `touch-action: manipulation` … スマホでダブルタップによる拡大を無効にし、タップの反応を速くする。
 - `:disabled` … 押せないときは薄く。`:not(:disabled):active` … 押せる状態で押している間だけ1px下げる。
+
+## ボタン方式のボタン
+
+**L653–664**
+
+```css
+653 | 
+654 | /* ---------- ボタン方式のタッチ操作（置き方22パターン） ---------- */
+655 | .pad {
+656 |   grid-area: pad;
+657 |   width: 100%;
+658 |   max-width: 460px;
+659 |   margin: 0 auto;
+660 |   padding: 6px 0 8px;
+661 |   display: grid;
+662 |   gap: 5px;
+663 |   touch-action: none;
+664 | }
+```
+
+`.pad` … ボタン方式のボタンを入れる箱。`#app` の `pad` の領域に置く。
+- `max-width: 460px` と `margin: 0 auto` … 横に広い画面でも広がりすぎないようにして、中央に寄せる。
+- `display: grid` と `gap: 5px` … 4段のボタン列を5px間隔で縦に並べる。
+- `touch-action: none` … このあたりを触っても、スクロールや拡大をしない。
+
+**L665–671**
+
+```css
+665 | 
+666 | /* 半列刻みの12マス。縦置きは2マス、横置きは境目をまたいで2マス使う */
+667 | .pad-row {
+668 |   display: grid;
+669 |   grid-template-columns: repeat(12, minmax(0, 1fr));
+670 |   gap: 4px;
+671 | }
+```
+
+`.pad-row` … ボタン1段。横を**12マス**（半列ずつ）に分ける。`repeat(12, minmax(0, 1fr))` は「同じ幅のマスを12個」。
+縦置きのボタンは2マスずつ使うので1列ぶんの幅になり、横置きのボタンは1マスずらして2マス使うので、2列の境目の真下に来る（位置は `pad.ts` が `gridColumn` で決める）。
+
+**L672–686**
+
+```css
+672 | 
+673 | .pad-btn {
+674 |   height: 44px;
+675 |   padding: 0;
+676 |   display: flex;
+677 |   align-items: center;
+678 |   justify-content: center;
+679 |   border: 1px solid var(--gold-dim);
+680 |   border-radius: 9px;
+681 |   background: rgba(30, 26, 54, 0.85);
+682 |   cursor: pointer;
+683 |   touch-action: none;
+684 |   -webkit-touch-callout: none;
+685 | }
+686 | 
+```
+
+`.pad-btn` … ボタン1個。高さ44px（指で押しやすい大きさ）。中に描くぷよ2個を `flex` で中央に並べる。
+- `-webkit-touch-callout: none` … iPhone で長押ししたときのメニューを出さない。
+
+**L687–690**
+
+```css
+687 | .pad-btn.v {
+688 |   flex-direction: column;
+689 | }
+690 | 
+```
+
+`.v` は縦置きのボタン。ぷよ2個を縦に並べる（`flex-direction: column`）。
+
+**L691–696**
+
+```css
+691 | .pad-gem {
+692 |   width: 18px;
+693 |   height: 18px;
+694 |   background: center / contain no-repeat;
+695 | }
+696 | 
+```
+
+`.pad-gem` … ボタンの中のぷよ1個。画像（宝石の絵）は `pad.ts` が `backgroundImage` で入れる。`center / contain no-repeat` は「中央に、はみ出さない大きさで、1回だけ」。
+
+**L697–702**
+
+```css
+697 | /* 軸ぷよの目印 */
+698 | .pad-gem.axis {
+699 |   border-radius: 50%;
+700 |   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+701 | }
+702 | 
+```
+
+軸ぷよには白い細い輪を付けて、どちらが軸かを分かるようにする。`box-shadow: 0 0 0 1.5px` はぼかさない影＝外側の線になる。
+
+**L703–707**
+
+```css
+703 | /* 同じ色のペアで、結果が他のボタンと同じになるもの */
+704 | .pad-btn.dup {
+705 |   opacity: 0.4;
+706 | }
+707 | 
+```
+
+同じ色のペアのとき、他のボタンと結果が同じになるボタン（子が下・子が左）を薄くする。
+
+**L708–712**
+
+```css
+708 | .pad-btn.active {
+709 |   border-color: var(--gold);
+710 |   background: rgba(214, 190, 140, 0.28);
+711 | }
+712 | 
+```
+
+押している間のボタンを金色にする。
+
+**L713–715**
+
+```css
+713 | .pad.disabled .pad-btn:not(.active) {
+714 |   opacity: 0.55;
+715 | }
+```
+
+連鎖の演出中など、まだ置けないときはボタンを薄くする（押している最中のボタンは除く）。

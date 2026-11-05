@@ -6,6 +6,7 @@ import { Field, clampPlacement, type Rotation } from './core/field';
 import { Game } from './core/game';
 import { randomSeed } from './core/tsumo';
 import { Keyboard, Pointer, TwoHand, type ControlHandlers } from './input/controls';
+import { ButtonPad } from './input/pad';
 import { Renderer, type Cursor, type TurnAnimation } from './render/renderer';
 import {
   clearRecords,
@@ -253,6 +254,7 @@ const pointer = new Pointer(
   handlers,
 );
 const twoHand = new TwoHand(canvas, handlers);
+const pad = new ButtonPad($('pad'), handlers);
 
 function goMenu(): void {
   mode = 'menu';
@@ -366,6 +368,7 @@ function frame(now: number): void {
     now,
     dt,
   );
+  if (pad.enabled) pad.update(game && !game.finished ? game.current() : null, canControl());
   requestAnimationFrame(frame);
 }
 
@@ -465,10 +468,13 @@ function renderHowto(): void {
     '<b>キーボード</b>　<kbd>←</kbd><kbd>→</kbd> 移動　<kbd>Z</kbd><kbd>X</kbd> 回転　<kbd>↓</kbd>/<kbd>↑</kbd> 設置';
   const direct =
     '<b>キーボード</b>　<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 子ぷよの向き　<kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>;</kbd><kbd>\'</kbd> その列に設置';
-  const touch =
-    options.touchScheme === 'twohand'
-      ? '<b>タッチ（両手）</b>　左半分を横にスワイプで列、右半分をフリックで子ぷよの向き。右を先に離すと設置、左を先に離すと取り消し'
-      : '<b>タッチ</b>　列をタップで縦置き、フリックで子ぷよの向き。盤面の外まで引っぱるか2本目の指でタップすると取り消し（マウスは右クリック）';
+  const touch = {
+    single:
+      '<b>タッチ</b>　列をタップで縦置き、フリックで子ぷよの向き。盤面の外まで引っぱるか2本目の指でタップすると取り消し（マウスは右クリック）',
+    twohand:
+      '<b>タッチ（両手）</b>　左半分を横にスワイプで列、右半分をフリックで子ぷよの向き。右を離すと設置、左を先に離すと取り消し（左は押したままでよい）',
+    buttons: '<b>タッチ（ボタン）</b>　盤面の下のボタンで置き方を選び、離すと設置。ボタンの外までずらして離すと取り消し',
+  }[options.touchScheme];
   const common = `${touch}<br><kbd>Q</kbd> 1手戻す(+5秒)　<kbd>R</kbd> リトライ　<kbd>N</kbd> 新しいシード　<kbd>Esc</kbd> メニュー`;
   const key = options.controlScheme === 'arrow' ? arrow : direct;
   ui.howto.innerHTML = `${key}<br>${common}`;
@@ -482,6 +488,8 @@ function applyOptions(): void {
   twoHand.enabled = options.touchScheme === 'twohand';
   twoHand.threshold = options.flickThreshold;
   twoHand.columnStep = options.columnStep;
+  pad.enabled = options.touchScheme === 'buttons';
+  $('pad').hidden = !pad.enabled;
   sound.setVolume(options.sfxVolume);
   for (const b of $('opt-scheme').querySelectorAll<HTMLButtonElement>('.seg-btn')) {
     b.setAttribute('aria-pressed', String(b.dataset.value === options.controlScheme));

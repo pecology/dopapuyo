@@ -72,240 +72,250 @@ Google Fonts からフォントを読み込む。
 - L21: 盤面を描く canvas。`aria-label` は読み上げソフト用の名前。
 - L22: 「1手戻す」ボタン。最初は `hidden`（非表示）で、プレイ中に `main.ts` が表示し、位置も合わせる。`type="button"` は、フォームの送信ボタンとして扱われないようにするための指定。
 
-**L24–45**
+**L24–26**
 
 ```html
  24 | 
- 25 |       <aside class="hud" id="hud">
- 26 |         <div class="hud-brand">どぱぷよ</div>
- 27 |         <div class="hud-time">
- 28 |           <span class="label">TIME</span>
- 29 |           <span class="value" id="time">0:00.00</span>
- 30 |           <span class="penalty" id="penalty" hidden></span>
- 31 |         </div>
- 32 |         <div class="hud-score">
- 33 |           <span class="label">SCORE</span>
- 34 |           <span class="value" id="score">0</span>
- 35 |           <span class="target">/ <span id="target">100,000</span></span>
- 36 |           <div class="bar"><div class="bar-fill" id="bar"></div></div>
- 37 |         </div>
- 38 |         <dl class="hud-meta">
- 39 |           <div><dt>SEED</dt><dd id="seed">-</dd></div>
- 40 |           <div><dt>MAX</dt><dd id="maxchain">0連鎖</dd></div>
- 41 |           <div><dt>手数</dt><dd id="moves">0</dd></div>
- 42 |         </dl>
- 43 |         <div class="hud-keys" id="keyhelp"></div>
- 44 |       </aside>
- 45 | 
+ 25 |       <!-- ボタン方式のタッチ操作（置き方22パターン）。中身は input/pad.ts が作る -->
+ 26 |       <div class="pad" id="pad" hidden></div>
+```
+
+ボタン方式のタッチ操作で使う、置き方22パターンのボタンの置き場所。中身のボタンは `input/pad.ts` が作って入れる。最初は `hidden` で、オプションでボタン方式を選んだときだけ表示する。
+
+**L27–48**
+
+```html
+ 27 | 
+ 28 |       <aside class="hud" id="hud">
+ 29 |         <div class="hud-brand">どぱぷよ</div>
+ 30 |         <div class="hud-time">
+ 31 |           <span class="label">TIME</span>
+ 32 |           <span class="value" id="time">0:00.00</span>
+ 33 |           <span class="penalty" id="penalty" hidden></span>
+ 34 |         </div>
+ 35 |         <div class="hud-score">
+ 36 |           <span class="label">SCORE</span>
+ 37 |           <span class="value" id="score">0</span>
+ 38 |           <span class="target">/ <span id="target">100,000</span></span>
+ 39 |           <div class="bar"><div class="bar-fill" id="bar"></div></div>
+ 40 |         </div>
+ 41 |         <dl class="hud-meta">
+ 42 |           <div><dt>SEED</dt><dd id="seed">-</dd></div>
+ 43 |           <div><dt>MAX</dt><dd id="maxchain">0連鎖</dd></div>
+ 44 |           <div><dt>手数</dt><dd id="moves">0</dd></div>
+ 45 |         </dl>
+ 46 |         <div class="hud-keys" id="keyhelp"></div>
+ 47 |       </aside>
+ 48 | 
 ```
 
 上部（PCでは右側）の情報表示。`aside` は「補足的な内容」を表す要素。
-- L26: PCのときだけ出るロゴ。
-- L27–31: タイム。`penalty` はペナルティ合計の表示で、1手戻すまでは隠しておく。
-- L32–37: スコア。`/ 100,000` の目標点と、進み具合のバー（`bar` の中の `bar-fill` の幅を変えて伸ばす）。
-- L38–42: シード・最大連鎖・手数。`dl`（説明リスト）は「見出し `dt` と内容 `dd` の組」を並べるための要素。
-- L43: PCのときだけ出る操作説明。中身は `main.ts` が書き込む。
+- L29: PCのときだけ出るロゴ。
+- L30–34: タイム。`penalty` はペナルティ合計の表示で、1手戻すまでは隠しておく。
+- L35–40: スコア。`/ 100,000` の目標点と、進み具合のバー（`bar` の中の `bar-fill` の幅を変えて伸ばす）。
+- L41–45: シード・最大連鎖・手数。`dl`（説明リスト）は「見出し `dt` と内容 `dd` の組」を並べるための要素。
+- L46: PCのときだけ出る操作説明。中身は `main.ts` が書き込む。
 
 ## メニュー画面
 
-**L46–56**
+**L49–59**
 
 ```html
- 46 |       <!-- メニュー -->
- 47 |       <section class="overlay" id="menu">
- 48 |         <div class="panel menu">
- 49 |           <h1 class="logo">どぱぷよ</h1>
- 50 |           <p class="tagline">上級者向け 連鎖スコアアタック</p>
- 51 | 
- 52 |           <div class="field-group">
- 53 |             <div class="group-label">目標点</div>
- 54 |             <div class="seg" id="targets" role="radiogroup" aria-label="目標点"></div>
- 55 |           </div>
- 56 | 
+ 49 |       <!-- メニュー -->
+ 50 |       <section class="overlay" id="menu">
+ 51 |         <div class="panel menu">
+ 52 |           <h1 class="logo">どぱぷよ</h1>
+ 53 |           <p class="tagline">上級者向け 連鎖スコアアタック</p>
+ 54 | 
+ 55 |           <div class="field-group">
+ 56 |             <div class="group-label">目標点</div>
+ 57 |             <div class="seg" id="targets" role="radiogroup" aria-label="目標点"></div>
+ 58 |           </div>
+ 59 | 
 ```
 
 画面の上に重ねて表示する画面（オーバーレイ）。`section` はひとまとまりの区画。
-- L49: ロゴ。`h1` はページの一番大きな見出し。
-- L52–55: 目標点のボタンを入れる場所。ボタン自体は `main.ts` が作る。`role="radiogroup"` は「この中から1つを選ぶ」グループだと読み上げソフトに伝える。
+- L52: ロゴ。`h1` はページの一番大きな見出し。
+- L55–58: 目標点のボタンを入れる場所。ボタン自体は `main.ts` が作る。`role="radiogroup"` は「この中から1つを選ぶ」グループだと読み上げソフトに伝える。
 
-**L57–67**
+**L60–70**
 
 ```html
- 57 |           <div class="field-group">
- 58 |             <div class="group-label">シード（配ぷよ）</div>
- 59 |             <div class="seed-row">
- 60 |               <div class="seg" role="radiogroup" aria-label="シードの選び方">
- 61 |                 <button type="button" class="seg-btn" id="seed-random" aria-pressed="true">ランダム</button>
- 62 |                 <button type="button" class="seg-btn" id="seed-fixed" aria-pressed="false">番号指定</button>
- 63 |               </div>
- 64 |               <input id="seed-input" type="number" inputmode="numeric" min="1" max="65536" placeholder="1〜65536" disabled />
- 65 |             </div>
- 66 |           </div>
- 67 | 
+ 60 |           <div class="field-group">
+ 61 |             <div class="group-label">シード（配ぷよ）</div>
+ 62 |             <div class="seed-row">
+ 63 |               <div class="seg" role="radiogroup" aria-label="シードの選び方">
+ 64 |                 <button type="button" class="seg-btn" id="seed-random" aria-pressed="true">ランダム</button>
+ 65 |                 <button type="button" class="seg-btn" id="seed-fixed" aria-pressed="false">番号指定</button>
+ 66 |               </div>
+ 67 |               <input id="seed-input" type="number" inputmode="numeric" min="1" max="65536" placeholder="1〜65536" disabled />
+ 68 |             </div>
+ 69 |           </div>
+ 70 | 
 ```
 
 シードの選び方。ランダム／番号指定のボタンと、番号の入力欄。
 - `aria-pressed` … ボタンが押された（選ばれた）状態か。CSS がこれを見て見た目を変える。
-- L64: 数字の入力欄。`inputmode="numeric"` でスマホでは数字キーボードが出る。最初は `disabled`（入力できない）。
+- L67: 数字の入力欄。`inputmode="numeric"` でスマホでは数字キーボードが出る。最初は `disabled`（入力できない）。
 
-**L68–78**
+**L71–81**
 
 ```html
- 68 |           <button type="button" class="btn primary" id="start">スタート <kbd>Enter</kbd></button>
- 69 |           <div class="row">
- 70 |             <button type="button" class="btn" id="open-ranking">ランキング</button>
- 71 |             <button type="button" class="btn" id="open-options">オプション</button>
- 72 |           </div>
- 73 | 
- 74 |           <div class="howto" id="howto"></div>
- 75 |           <p class="disclaimer">非公式のファンメイド作品です。株式会社セガとは関係ありません。</p>
- 76 |         </div>
- 77 |       </section>
- 78 | 
+ 71 |           <button type="button" class="btn primary" id="start">スタート <kbd>Enter</kbd></button>
+ 72 |           <div class="row">
+ 73 |             <button type="button" class="btn" id="open-ranking">ランキング</button>
+ 74 |             <button type="button" class="btn" id="open-options">オプション</button>
+ 75 |           </div>
+ 76 | 
+ 77 |           <div class="howto" id="howto"></div>
+ 78 |           <p class="disclaimer">非公式のファンメイド作品です。株式会社セガとは関係ありません。</p>
+ 79 |         </div>
+ 80 |       </section>
+ 81 | 
 ```
 
-- L68: スタートボタン。`<kbd>` はキーボードのキーを表す要素。
-- L69–72: ランキングとオプションのボタン。
-- L74: 遊び方の説明（`main.ts` が書き込む）。
-- L75: 非公式であることの表示。
+- L71: スタートボタン。`<kbd>` はキーボードのキーを表す要素。
+- L72–75: ランキングとオプションのボタン。
+- L77: 遊び方の説明（`main.ts` が書き込む）。
+- L78: 非公式であることの表示。
 
 ## オプション画面
 
-**L79–129**
+**L82–133**
 
 ```html
- 79 |       <!-- オプション -->
- 80 |       <section class="overlay" id="options" hidden>
- 81 |         <div class="panel">
- 82 |           <h2>オプション</h2>
- 83 |           <div class="field-group">
- 84 |             <div class="group-label">キーボード操作</div>
- 85 |             <div class="seg" id="opt-scheme">
- 86 |               <button type="button" class="seg-btn" data-value="arrow">矢印キー</button>
- 87 |               <button type="button" class="seg-btn" data-value="direct">直接指定</button>
- 88 |             </div>
- 89 |           </div>
- 90 |           <div class="field-group">
- 91 |             <div class="group-label">次のペアの列</div>
- 92 |             <div class="seg" id="opt-spawn-col">
- 93 |               <button type="button" class="seg-btn" data-value="reset">3列目に戻す</button>
- 94 |               <button type="button" class="seg-btn" data-value="keep">直前の列を引き継ぐ</button>
- 95 |             </div>
- 96 |           </div>
- 97 |           <div class="field-group">
- 98 |             <div class="group-label">次のペアの子ぷよの向き</div>
- 99 |             <div class="seg" id="opt-spawn-rot">
-100 |               <button type="button" class="seg-btn" data-value="reset">上に戻す</button>
-101 |               <button type="button" class="seg-btn" data-value="keep">直前の向きを引き継ぐ</button>
-102 |             </div>
-103 |           </div>
-104 |           <div class="field-group">
-105 |             <div class="group-label">タッチ操作</div>
-106 |             <div class="seg" id="opt-touch">
-107 |               <button type="button" class="seg-btn" data-value="single">片手（タップ＋フリック）</button>
-108 |               <button type="button" class="seg-btn" data-value="twohand">両手（左で列・右で向き）</button>
-109 |             </div>
-110 |           </div>
-111 |           <div class="field-group" id="opt-step-group">
-112 |             <label class="group-label" for="opt-step">両手モードで1列動かす距離 <output id="opt-step-out"></output></label>
-113 |             <input id="opt-step" type="range" min="12" max="80" step="2" />
+ 82 |       <!-- オプション -->
+ 83 |       <section class="overlay" id="options" hidden>
+ 84 |         <div class="panel">
+ 85 |           <h2>オプション</h2>
+ 86 |           <div class="field-group">
+ 87 |             <div class="group-label">キーボード操作</div>
+ 88 |             <div class="seg" id="opt-scheme">
+ 89 |               <button type="button" class="seg-btn" data-value="arrow">矢印キー</button>
+ 90 |               <button type="button" class="seg-btn" data-value="direct">直接指定</button>
+ 91 |             </div>
+ 92 |           </div>
+ 93 |           <div class="field-group">
+ 94 |             <div class="group-label">次のペアの列</div>
+ 95 |             <div class="seg" id="opt-spawn-col">
+ 96 |               <button type="button" class="seg-btn" data-value="reset">3列目に戻す</button>
+ 97 |               <button type="button" class="seg-btn" data-value="keep">直前の列を引き継ぐ</button>
+ 98 |             </div>
+ 99 |           </div>
+100 |           <div class="field-group">
+101 |             <div class="group-label">次のペアの子ぷよの向き</div>
+102 |             <div class="seg" id="opt-spawn-rot">
+103 |               <button type="button" class="seg-btn" data-value="reset">上に戻す</button>
+104 |               <button type="button" class="seg-btn" data-value="keep">直前の向きを引き継ぐ</button>
+105 |             </div>
+106 |           </div>
+107 |           <div class="field-group">
+108 |             <div class="group-label">タッチ操作</div>
+109 |             <div class="seg" id="opt-touch">
+110 |               <button type="button" class="seg-btn" data-value="single">片手（タップ＋フリック）</button>
+111 |               <button type="button" class="seg-btn" data-value="twohand">両手（左で列・右で向き）</button>
+112 |               <button type="button" class="seg-btn" data-value="buttons">ボタン（置き方を選ぶ）</button>
+113 |             </div>
 114 |           </div>
-115 |           <div class="field-group">
-116 |             <label class="group-label" for="opt-flick">フリック判定の距離 <output id="opt-flick-out"></output></label>
-117 |             <input id="opt-flick" type="range" min="8" max="64" step="2" />
+115 |           <div class="field-group" id="opt-step-group">
+116 |             <label class="group-label" for="opt-step">両手モードで1列動かす距離 <output id="opt-step-out"></output></label>
+117 |             <input id="opt-step" type="range" min="12" max="80" step="2" />
 118 |           </div>
 119 |           <div class="field-group">
-120 |             <label class="group-label" for="opt-volume">効果音 <output id="opt-volume-out"></output></label>
-121 |             <input id="opt-volume" type="range" min="0" max="1" step="0.05" />
+120 |             <label class="group-label" for="opt-flick">フリック判定の距離 <output id="opt-flick-out"></output></label>
+121 |             <input id="opt-flick" type="range" min="8" max="64" step="2" />
 122 |           </div>
-123 |           <div class="row">
-124 |             <button type="button" class="btn danger" id="clear-records">記録をすべて削除</button>
-125 |             <button type="button" class="btn primary" id="close-options">閉じる</button>
+123 |           <div class="field-group">
+124 |             <label class="group-label" for="opt-volume">効果音 <output id="opt-volume-out"></output></label>
+125 |             <input id="opt-volume" type="range" min="0" max="1" step="0.05" />
 126 |           </div>
-127 |         </div>
-128 |       </section>
-129 | 
+127 |           <div class="row">
+128 |             <button type="button" class="btn danger" id="clear-records">記録をすべて削除</button>
+129 |             <button type="button" class="btn primary" id="close-options">閉じる</button>
+130 |           </div>
+131 |         </div>
+132 |       </section>
+133 | 
 ```
 
 最初は `hidden`。
-- L85–88, L92–95, L99–102, L106–109: 選択式のボタン（キーボード操作・次のペアの列・次のペアの子ぷよの向き・タッチ操作）。`data-value` 属性に設定値を書いておき、`main.ts` が `dataset.value` で読む。
-- L111–114: 両手モードで1列動かす距離のスライダー（`id="opt-step-group"` の囲みごと）。両手モードのときだけ表示する。
-- L116–117: フリック判定の距離のスライダー（`type="range"`）。`label` の `for="opt-flick"` で、文字を押してもスライダーが操作対象になる。`output` は計算結果などを表示する要素で、今の値（`24px` など）を出す。
-- L120–121: 効果音の音量スライダー。0〜1 を 0.05 刻み。
-- L123–126: 記録削除と閉じるボタン。
-
+- L88–91, L95–98, L102–105, L109–113: 選択式のボタン（キーボード操作・次のペアの列・次のペアの子ぷよの向き・タッチ操作）。`data-value` 属性に設定値を書いておき、`main.ts` が `dataset.value` で読む。タッチ操作は片手・両手・ボタンの3つ。
+- L115–118: 両手モードで1列動かす距離のスライダー（`id="opt-step-group"` の囲みごと）。両手モードのときだけ表示する。
+- L120–121: フリック判定の距離のスライダー（`type="range"`）。`label` の `for="opt-flick"` で、文字を押してもスライダーが操作対象になる。`output` は計算結果などを表示する要素で、今の値（`24px` など）を出す。
+- L124–125: 効果音の音量スライダー。0〜1 を 0.05 刻み。
+- L127–130: 記録削除と閉じるボタン。
 
 ## ランキング画面
 
-**L130–147**
+**L134–151**
 
 ```html
-130 |       <!-- ランキング -->
-131 |       <section class="overlay" id="ranking" hidden>
-132 |         <div class="panel wide">
-133 |           <h2>ランキング</h2>
-134 |           <div class="seg" id="rank-tabs"></div>
-135 |           <p class="note" id="rank-note" hidden>設定定数がデフォルトと違うため、別枠の記録を表示しています。</p>
-136 |           <div class="table-wrap">
-137 |             <table class="rank-table">
-138 |               <thead>
-139 |                 <tr><th>#</th><th>タイム</th><th>シード</th><th>最大連鎖</th><th>手数</th><th>戻し</th><th>日付</th></tr>
-140 |               </thead>
-141 |               <tbody id="rank-body"></tbody>
-142 |             </table>
-143 |           </div>
-144 |           <button type="button" class="btn primary" id="close-ranking">閉じる</button>
-145 |         </div>
-146 |       </section>
-147 | 
+134 |       <!-- ランキング -->
+135 |       <section class="overlay" id="ranking" hidden>
+136 |         <div class="panel wide">
+137 |           <h2>ランキング</h2>
+138 |           <div class="seg" id="rank-tabs"></div>
+139 |           <p class="note" id="rank-note" hidden>設定定数がデフォルトと違うため、別枠の記録を表示しています。</p>
+140 |           <div class="table-wrap">
+141 |             <table class="rank-table">
+142 |               <thead>
+143 |                 <tr><th>#</th><th>タイム</th><th>シード</th><th>最大連鎖</th><th>手数</th><th>戻し</th><th>日付</th></tr>
+144 |               </thead>
+145 |               <tbody id="rank-body"></tbody>
+146 |             </table>
+147 |           </div>
+148 |           <button type="button" class="btn primary" id="close-ranking">閉じる</button>
+149 |         </div>
+150 |       </section>
+151 | 
 ```
 
-- L134: 目標点ごとのタブ（`main.ts` が作る）。
-- L135: 設定定数を変えているときの注意書き。
-- L136–143: 記録の表。`thead` が見出し行、`tbody` が中身（`main.ts` が行を作って入れる）。`table-wrap` で包むのは、スマホで表が横にはみ出したときにその部分だけ横スクロールさせるため。
+- L138: 目標点ごとのタブ（`main.ts` が作る）。
+- L139: 設定定数を変えているときの注意書き。
+- L140–147: 記録の表。`thead` が見出し行、`tbody` が中身（`main.ts` が行を作って入れる）。`table-wrap` で包むのは、スマホで表が横にはみ出したときにその部分だけ横スクロールさせるため。
 
 ## 結果画面
 
-**L148–170**
+**L152–174**
 
 ```html
-148 |       <!-- 結果 -->
-149 |       <section class="overlay" id="result" hidden>
-150 |         <div class="panel result">
-151 |           <p class="result-kind" id="result-kind">CLEAR</p>
-152 |           <p class="result-time" id="result-time">0:00.00</p>
-153 |           <p class="result-delta" id="result-delta"></p>
-154 |           <dl class="result-meta">
-155 |             <div><dt>目標点</dt><dd id="result-target"></dd></div>
-156 |             <div><dt>スコア</dt><dd id="result-score"></dd></div>
-157 |             <div><dt>シード</dt><dd id="result-seed"></dd></div>
-158 |             <div><dt>最大連鎖</dt><dd id="result-chain"></dd></div>
-159 |             <div><dt>手数</dt><dd id="result-moves"></dd></div>
-160 |             <div><dt>戻し</dt><dd id="result-undos"></dd></div>
-161 |           </dl>
-162 |           <div class="row">
-163 |             <button type="button" class="btn primary" id="retry">リトライ <kbd>R</kbd></button>
-164 |             <button type="button" class="btn" id="new-seed">新しいシード <kbd>N</kbd></button>
-165 |           </div>
-166 |           <button type="button" class="btn" id="result-undo" hidden>1手戻して続ける <kbd>Q</kbd></button>
-167 |           <button type="button" class="btn ghost" id="to-menu">メニューへ <kbd>Esc</kbd></button>
-168 |         </div>
-169 |       </section>
-170 |     </div>
+152 |       <!-- 結果 -->
+153 |       <section class="overlay" id="result" hidden>
+154 |         <div class="panel result">
+155 |           <p class="result-kind" id="result-kind">CLEAR</p>
+156 |           <p class="result-time" id="result-time">0:00.00</p>
+157 |           <p class="result-delta" id="result-delta"></p>
+158 |           <dl class="result-meta">
+159 |             <div><dt>目標点</dt><dd id="result-target"></dd></div>
+160 |             <div><dt>スコア</dt><dd id="result-score"></dd></div>
+161 |             <div><dt>シード</dt><dd id="result-seed"></dd></div>
+162 |             <div><dt>最大連鎖</dt><dd id="result-chain"></dd></div>
+163 |             <div><dt>手数</dt><dd id="result-moves"></dd></div>
+164 |             <div><dt>戻し</dt><dd id="result-undos"></dd></div>
+165 |           </dl>
+166 |           <div class="row">
+167 |             <button type="button" class="btn primary" id="retry">リトライ <kbd>R</kbd></button>
+168 |             <button type="button" class="btn" id="new-seed">新しいシード <kbd>N</kbd></button>
+169 |           </div>
+170 |           <button type="button" class="btn" id="result-undo" hidden>1手戻して続ける <kbd>Q</kbd></button>
+171 |           <button type="button" class="btn ghost" id="to-menu">メニューへ <kbd>Esc</kbd></button>
+172 |         </div>
+173 |       </section>
+174 |     </div>
 ```
 
-- L151–153: 見出し（CLEAR / NEW RECORD / 窒息）、タイム、ベストとの差。
-- L154–161: 詳細の数値。
-- L162–167: リトライ、新しいシード、1手戻して続ける（窒息時だけ表示）、メニューへ。
-- L170: アプリ全体の箱の終わり。
+- L155–157: 見出し（CLEAR / NEW RECORD / 窒息）、タイム、ベストとの差。
+- L158–165: 詳細の数値。
+- L166–171: リトライ、新しいシード、1手戻して続ける（窒息時だけ表示）、メニューへ。
+- L174: アプリ全体の箱の終わり。
 
-**L171–173**
+**L175–177**
 
 ```html
-171 |     <script type="module" src="./src/main.ts"></script>
-172 |   </body>
-173 | </html>
+175 |     <script type="module" src="./src/main.ts"></script>
+176 |   </body>
+177 | </html>
 ```
 
-- L171: プログラムを読み込む。`type="module"` は、`import` / `export` を使った書き方（ESモジュール）のファイルだという指定。開発中は Vite が `main.ts` をその場でブラウザが読める形に変換し、`npm run build` では全部を1つの JavaScript ファイルにまとめて、この行をそのファイルへの参照に書き換える。
-- L172–173: ページの終わり。
+- L175: プログラムを読み込む。`type="module"` は、`import` / `export` を使った書き方（ESモジュール）のファイルだという指定。開発中は Vite が `main.ts` をその場でブラウザが読める形に変換し、`npm run build` では全部を1つの JavaScript ファイルにまとめて、この行をそのファイルへの参照に書き換える。
+- L176–177: ページの終わり。

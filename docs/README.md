@@ -22,6 +22,7 @@
 | 9 | [09_render_gems.md](09_render_gems.md) | `src/render/gems.ts` | 宝石ぷよ1個の絵 |
 | 10 | [10_render_renderer.md](10_render_renderer.md) | `src/render/renderer.ts` | 盤面・アニメーション・エフェクトの描画 |
 | 11 | [11_input_controls.md](11_input_controls.md) | `src/input/controls.ts` | キーボード・タッチ入力 |
+| 21 | [21_input_pad.md](21_input_pad.md) | `src/input/pad.ts` | タッチ操作のボタン方式（置き方22パターンのボタン） |
 | 12 | [12_main.md](12_main.md) | `src/main.ts` | 全体の組み立て、時間の管理、画面の切り替え |
 | 13 | [13_index_html.md](13_index_html.md) | `index.html` | 画面の部品 |
 | 14 | [14_style_css.md](14_style_css.md) | `src/style.css` | 見た目 |

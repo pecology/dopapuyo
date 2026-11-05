@@ -22,6 +22,9 @@
         <button type="button" class="undo-btn" id="undo" hidden>1手戻す<small>+5秒</small></button>
       </main>
 
+      <!-- ボタン方式のタッチ操作（置き方22パターン）。中身は input/pad.ts が作る -->
+      <div class="pad" id="pad" hidden></div>
+
       <aside class="hud" id="hud">
         <div class="hud-brand">どぱぷよ</div>
         <div class="hud-time">
@@ -106,6 +109,7 @@
             <div class="seg" id="opt-touch">
               <button type="button" class="seg-btn" data-value="single">片手（タップ＋フリック）</button>
               <button type="button" class="seg-btn" data-value="twohand">両手（左で列・右で向き）</button>
+              <button type="button" class="seg-btn" data-value="buttons">ボタン（置き方を選ぶ）</button>
             </div>
           </div>
           <div class="field-group" id="opt-step-group">
