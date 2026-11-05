@@ -7,13 +7,15 @@ export interface Pair {
   child: Color;
 }
 
-/** 配ぷよ1ループの個数（128手ぶん） */
-const POOL_SIZE = 256;
+/** 1ループの手数 */
+const LOOP = 128;
+/** 色の数をそろえる単位（8手＝16個） */
+const BLOCK_PAIRS = 8;
 /** 本家の色の総数 */
 const ALL_COLORS = 5;
 
 /**
- * ぷよぷよeスポーツと同じ線形合同法の乱数。
+ * 線形合同法の乱数（ぷよぷよeスポーツと同じ定数）。
  * 状態を進めてから、上位16bitを 0〜m-1 に縮めて返す（剰余ではなく掛けて16bitずらす）。
  */
 export function createRng(seed: number): (m: number) => number {
@@ -25,46 +27,54 @@ export function createRng(seed: number): (m: number) => number {
 }
 
 /**
- * シードから1ループ分（128手）の配ぷよを生成する（ぷよぷよeスポーツの方式）。
- * 1. 5色の並び順（カラーマップ）を決める
- * 2. 3色・4色・5色用に 0,1,2,… を順に並べた256個の表を作り、それぞれをシャッフルする
- *    （16個・32個・64個ずつの区画で、隣り合う区画どうしの要素を入れ替える）
- * 3. 4色・5色の表の先頭4個を3色の表で上書きする（最初の2手は必ず3色以内）
- * 表に各色が同じ数ずつ入っているので、1ループ内の色の出現数はほぼ均等になる。
+ * シードから1ループ分（128手）の配ぷよを生成する。ぷよぷよeスポーツのチャレンジモードの性質に合わせた本作独自の方式。
+ * - 8手（16個）ごとに区切り、区切りの中で各色の数をそろえる（4色なら4個ずつ）
+ *   3色・5色は16個を割り切れないので、1色だけ1個多くし、その色を8手ごとに順番に替える（9〜128手目の合計は全色同じ）
+ * - 最初の2手（4個）には必ずちょうど3色が入る
+ * - 区切りの中の並びは乱数でシャッフルする
  */
 export function generateTsumo(seed: number, colorCount: number = CONFIG.COLOR_COUNT): Pair[] {
   const rand = createRng(seed & 0xffff);
+  const n = Math.min(Math.max(colorCount, 3), ALL_COLORS);
 
+  // 5色のうちどれをどの番号に使うか（カラーマップ）
   const remaining = Array.from({ length: ALL_COLORS }, (_, i) => i);
   const colorMap: Color[] = [];
   for (let k = ALL_COLORS; k >= 1; k--) {
     colorMap.push(remaining.splice(rand(k), 1)[0]);
   }
 
-  const pools = [3, 4, 5].map((n) => {
-    const pool = Array.from({ length: POOL_SIZE }, (_, i) => i % n);
-    for (const len of [16, 32, 64]) {
-      for (let row = 0; row < POOL_SIZE / len - 1; row++) {
-        for (let k = 0; k < len / 2; k++) {
-          const a = row * len + rand(len);
-          const b = (row + 1) * len + rand(len);
-          [pool[a], pool[b]] = [pool[b], pool[a]];
-        }
-      }
+  const size = BLOCK_PAIRS * 2;
+  const base = Math.floor(size / n);
+  const hasExtra = size % n !== 0;
+  const puyos: Color[] = [];
+  for (let block = 0; block < LOOP / BLOCK_PAIRS; block++) {
+    // 1個多くする色。最初の区切りは乱数、以降は順番に替える
+    const extra = block === 0 ? rand(n) : (block - 1) % n;
+    const pool: number[] = [];
+    for (let c = 0; c < n; c++) {
+      const count = base + (hasExtra && c === extra ? 1 : 0);
+      for (let k = 0; k < count; k++) pool.push(c);
     }
-    return pool;
-  });
-  for (let i = 0; i < 4; i++) {
-    pools[1][i] = pools[0][i];
-    pools[2][i] = pools[0][i];
+    do {
+      shuffle(pool, rand);
+    } while (block === 0 && new Set(pool.slice(0, 4)).size !== 3);
+    for (const c of pool) puyos.push(colorMap[c]);
   }
 
-  const pool = pools[Math.min(Math.max(colorCount, 3), 5) - 3];
   const pairs: Pair[] = [];
-  for (let i = 0; i < POOL_SIZE; i += 2) {
-    pairs.push({ axis: colorMap[pool[i]], child: colorMap[pool[i + 1]] });
+  for (let i = 0; i < puyos.length; i += 2) {
+    pairs.push({ axis: puyos[i], child: puyos[i + 1] });
   }
   return pairs;
+}
+
+/** 配列をその場でシャッフルする（フィッシャー–イェーツ） */
+function shuffle(a: number[], rand: (m: number) => number): void {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = rand(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
 }
 
 /** シードをランダムに選ぶ（1〜SEED_COUNT） */

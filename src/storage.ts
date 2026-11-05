@@ -32,8 +32,8 @@ export interface RunRecord {
 }
 
 const OPTIONS_KEY = 'dopapuyo.options.v1';
-// v2: 配ぷよをぷよぷよeスポーツ方式に変えたので、v1 の記録とは分けて保存する
-const RECORDS_KEY = 'dopapuyo.records.v2';
+// 配ぷよの作り方を変えるたびに版を上げ、前の記録とは分けて保存する（v3: チャレンジモード風の配ぷよ）
+const RECORDS_KEY = 'dopapuyo.records.v3';
 const RANK_LIMIT = 10;
 
 export const DEFAULT_OPTIONS: Options = {

@@ -154,34 +154,35 @@ describe('tsumo', () => {
     expect(generateTsumo(1)).toHaveLength(128);
   });
 
-  it('limits the first two pairs to three colors', () => {
-    for (let seed = 0; seed < 2000; seed++) {
-      const t = generateTsumo(seed);
-      const colors = new Set([t[0].axis, t[0].child, t[1].axis, t[1].child]);
-      expect(colors.size).toBeLessThanOrEqual(3);
-    }
-  });
-
-  it('shares the opening between color counts', () => {
-    for (let seed = 0; seed < 200; seed++) {
-      const three = generateTsumo(seed, 3).slice(0, 2);
-      expect(generateTsumo(seed, 4).slice(0, 2)).toEqual(three);
-      expect(generateTsumo(seed, 5).slice(0, 2)).toEqual(three);
-    }
-  });
-
-  it('deals each color 64 times per loop apart from the opening', () => {
-    for (let seed = 0; seed < 200; seed++) {
-      const t = generateTsumo(seed, 4);
-      const counts = new Map<number, number>();
-      for (const p of t.slice(2)) {
-        counts.set(p.axis, (counts.get(p.axis) ?? 0) + 1);
-        counts.set(p.child, (counts.get(p.child) ?? 0) + 1);
+  it('puts exactly three colors in the first two pairs', () => {
+    for (const colors of [3, 4, 5]) {
+      for (let seed = 0; seed < 1000; seed++) {
+        const t = generateTsumo(seed, colors);
+        const set = new Set([t[0].axis, t[0].child, t[1].axis, t[1].child]);
+        expect(set.size).toBe(3);
       }
-      // 4色の表は各色64個。先頭4個を3色の表で上書きするので、残り252個の内訳は各色60〜64個
-      expect(counts.size).toBe(4);
-      for (const c of counts.values()) expect(c).toBeGreaterThanOrEqual(60);
-      for (const c of counts.values()) expect(c).toBeLessThanOrEqual(64);
+    }
+  });
+
+  it('balances colors in every 8 pairs after the opening', () => {
+    for (const colors of [3, 4, 5]) {
+      for (let seed = 0; seed < 200; seed++) {
+        const puyos = generateTsumo(seed, colors).flatMap((p) => [p.axis, p.child]);
+        const total = new Map<number, number>();
+        for (let block = 1; block < 16; block++) {
+          const counts = new Map<number, number>();
+          for (const c of puyos.slice(block * 16, block * 16 + 16)) {
+            counts.set(c, (counts.get(c) ?? 0) + 1);
+            total.set(c, (total.get(c) ?? 0) + 1);
+          }
+          // 16個を色数で分ける。割り切れないぶんは1色だけ1個多い
+          expect(counts.size).toBe(colors);
+          const values = [...counts.values()].sort((a, b) => a - b);
+          expect(values[values.length - 1] - values[0]).toBeLessThanOrEqual(1);
+        }
+        // 9〜128手目の合計は全色同じ
+        expect(new Set(total.values()).size).toBe(1);
+      }
     }
   });
 

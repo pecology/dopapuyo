@@ -3,17 +3,16 @@
 配ぷよ（ツモ）を作るファイル。**同じシード番号からは必ず同じ配ぷよが出る**ようにするのがポイント。
 `Math.random()` は毎回違う値を返すので使えない。代わりに「種（シード）から決まった順番で数を出す」自前の乱数を使う。
 
-作り方は**ぷよぷよeスポーツと同じ方式**にしている。本家の作り方は解析されて公開されている（参考: Puyo Nexus の解説 https://puyonexus.com/wiki/Puyo_Puyo!!_20th_Anniversary/Upcoming_Pair_Randomizer 。ぷよぷよ!!20th 以降の作品で使われ、ぷよぷよeスポーツ＝海外名 Puyo Puyo Champions もこの方式）。
-本家のデータを入れているのではなく、同じ計算をこのファイルでしている。
+作り方は、ぷよぷよeスポーツの**チャレンジモード**（1000万TA など）の配ぷよの性質に合わせた**本作独自の方式**。チャレンジモードの本当の作り方は公開されていないので、公開されている性質だけをまねている。そのため、同じシード番号でも本家の配ぷよとは一致しない。
 
 方式のあらまし:
 1. シード（0〜65535）から乱数を作る
 2. 5色の並び順（カラーマップ）を決める
-3. 3色用・4色用・5色用に、色番号を `0,1,2,0,1,2,…` のように256個並べた表を作り、それぞれを乱数で混ぜる
-4. 4色・5色の表の先頭4個を、3色の表の先頭4個で上書きする（だから最初の2手は必ず3色以内）
-5. 表を前から2個ずつ取って128手にする
+3. 128手を8手（16個）ずつの区切りに分け、区切りごとに「各色の数がそろった16個」を作ってシャッフルする（4色なら4個ずつ）
+4. 最初の区切りだけは、最初の2手（4個）にちょうど3色が入るまでシャッフルし直す
 
-表には各色が同じ数ずつ入っているので、**128手の中で色の出る数がほぼ均等になる**。1個ずつ独立にサイコロを振る方式（以前の本作）だと、ある色ばかり続いたり来なかったりする偏りが起きやすい。
+8手ごとに色の数がそろうので、**ある色ばかり続いたり、しばらく来なかったりする偏りが起きにくい**。
+以前の方式（対戦モードと同じ作り方）は128手全体では色の数がそろうが、途中では偏ることがあった。
 
 **L1–2**
 
@@ -41,144 +40,154 @@
 - `export type Color = number;` … 「色」は数値で表す（0=赤、1=緑、2=青、3=黄、4=紫）という**型の別名**。この並びは描画側の宝石（`render/gems.ts` の `GEMS`）の順番と同じ。中身はただの number だが、コードを読むときに「これは色だ」とわかる。
 - `export interface Pair { axis: Color; child: Color; }` … 1手ぶんの2個組。`axis` が軸ぷよ、`child` が子ぷよ。`interface` は「このオブジェクトはこういうプロパティを持つ」という形の宣言。
 
-**L10–14**
+**L10–16**
 
 ```ts
-10 | /** 配ぷよ1ループの個数（128手ぶん） */
-11 | const POOL_SIZE = 256;
-12 | /** 本家の色の総数 */
-13 | const ALL_COLORS = 5;
-14 | 
+10 | /** 1ループの手数 */
+11 | const LOOP = 128;
+12 | /** 色の数をそろえる単位（8手＝16個） */
+13 | const BLOCK_PAIRS = 8;
+14 | /** 本家の色の総数 */
+15 | const ALL_COLORS = 5;
+16 | 
 ```
 
-- `POOL_SIZE = 256` … 表の大きさ。2個で1手なので128手ぶん。128手でループするのはこのため。
+- `LOOP = 128` … 128手で一周する。
+- `BLOCK_PAIRS = 8` … 色の数をそろえる単位。8手＝16個。
 - `ALL_COLORS = 5` … 本家の色は全部で5色。4色で遊ぶときも、5色のうちどの4色を使うかはシードで決まる。
 
 ## 乱数 createRng
 
-**L15–26**
+**L17–28**
 
 ```ts
-15 | /**
-16 |  * ぷよぷよeスポーツと同じ線形合同法の乱数。
-17 |  * 状態を進めてから、上位16bitを 0〜m-1 に縮めて返す（剰余ではなく掛けて16bitずらす）。
-18 |  */
-19 | export function createRng(seed: number): (m: number) => number {
-20 |   let s = seed >>> 0;
-21 |   return (m) => {
-22 |     s = (Math.imul(s, 0x5d588b65) + 0x269ec3) >>> 0;
-23 |     return ((s >>> 16) * m) >>> 16;
-24 |   };
-25 | }
-26 | 
+17 | /**
+18 |  * 線形合同法の乱数（ぷよぷよeスポーツと同じ定数）。
+19 |  * 状態を進めてから、上位16bitを 0〜m-1 に縮めて返す（剰余ではなく掛けて16bitずらす）。
+20 |  */
+21 | export function createRng(seed: number): (m: number) => number {
+22 |   let s = seed >>> 0;
+23 |   return (m) => {
+24 |     s = (Math.imul(s, 0x5d588b65) + 0x269ec3) >>> 0;
+25 |     return ((s >>> 16) * m) >>> 16;
+26 |   };
+27 | }
+28 | 
 ```
 
-**線形合同法**（LCG）という昔からある乱数の作り方で、本家と同じ定数を使う。
-- L20: 状態 `s` をシードで初期化する。`>>> 0` は「32bit の符号なし整数にする」おまじない。
-- L22: 次の状態を「今の状態 × 0x5D588B65 ＋ 0x269EC3」で作る。`0x` は16進数。`Math.imul` は32bit 同士の掛け算（普通の `*` だと桁があふれて誤差が出るので使う）。`>>> 0` で32bit に収める。
-- L23: 状態の上位16bit（`s >>> 16`、0〜65535）に `m` を掛けて、また16bit 右にずらす。これで 0〜m-1 の数になる。`%`（割った余り）ではなくこの方法を使うのも本家と同じ。
+**線形合同法**（LCG）という昔からある乱数の作り方。定数はぷよぷよeスポーツと同じものを使っている。
+- L22: 状態 `s` をシードで初期化する。`>>> 0` は「32bit の符号なし整数にする」おまじない。
+- L24: 次の状態を「今の状態 × 0x5D588B65 ＋ 0x269EC3」で作る。`0x` は16進数。`Math.imul` は32bit 同士の掛け算（普通の `*` だと桁があふれて誤差が出るので使う）。`>>> 0` で32bit に収める。
+- L25: 状態の上位16bit（`s >>> 16`、0〜65535）に `m` を掛けて、また16bit 右にずらす。これで 0〜m-1 の数になる。
 - 戻り値は「呼ぶたびに次の数を返す関数」。`rand(5)` なら 0〜4 のどれかが返る。
 
 ## 配ぷよを作る generateTsumo
 
-**L27–36**
+**L29–39**
 
 ```ts
-27 | /**
-28 |  * シードから1ループ分（128手）の配ぷよを生成する（ぷよぷよeスポーツの方式）。
-29 |  * 1. 5色の並び順（カラーマップ）を決める
-30 |  * 2. 3色・4色・5色用に 0,1,2,… を順に並べた256個の表を作り、それぞれをシャッフルする
-31 |  *    （16個・32個・64個ずつの区画で、隣り合う区画どうしの要素を入れ替える）
-32 |  * 3. 4色・5色の表の先頭4個を3色の表で上書きする（最初の2手は必ず3色以内）
-33 |  * 表に各色が同じ数ずつ入っているので、1ループ内の色の出現数はほぼ均等になる。
-34 |  */
-35 | export function generateTsumo(seed: number, colorCount: number = CONFIG.COLOR_COUNT): Pair[] {
-36 |   const rand = createRng(seed & 0xffff);
+29 | /**
+30 |  * シードから1ループ分（128手）の配ぷよを生成する。ぷよぷよeスポーツのチャレンジモードの性質に合わせた本作独自の方式。
+31 |  * - 8手（16個）ごとに区切り、区切りの中で各色の数をそろえる（4色なら4個ずつ）
+32 |  *   3色・5色は16個を割り切れないので、1色だけ1個多くし、その色を8手ごとに順番に替える（9〜128手目の合計は全色同じ）
+33 |  * - 最初の2手（4個）には必ずちょうど3色が入る
+34 |  * - 区切りの中の並びは乱数でシャッフルする
+35 |  */
+36 | export function generateTsumo(seed: number, colorCount: number = CONFIG.COLOR_COUNT): Pair[] {
+37 |   const rand = createRng(seed & 0xffff);
+38 |   const n = Math.min(Math.max(colorCount, 3), ALL_COLORS);
+39 | 
 ```
 
-- 引数 `seed` … シード番号。`& 0xffff` で下16bit（0〜65535）だけを使う。本作のシード番号は 1〜65536 なので、65536 は本家の 0 番と同じになる。1〜65535 は本家の同じ番号。
+- 引数 `seed` … シード番号。`& 0xffff` で下16bit（0〜65535）だけを使う。本作のシード番号は 1〜65536 なので、65536 は 0 と同じ配ぷよになる。
 - 引数 `colorCount` … 色数（3〜5）。省略すると `CONFIG.COLOR_COUNT`（4）。
+- L38: 色数を 3〜5 に収める。
 
-**L37–42**
+**L40–46**
 
 ```ts
-37 | 
-38 |   const remaining = Array.from({ length: ALL_COLORS }, (_, i) => i);
-39 |   const colorMap: Color[] = [];
-40 |   for (let k = ALL_COLORS; k >= 1; k--) {
-41 |     colorMap.push(remaining.splice(rand(k), 1)[0]);
-42 |   }
+40 |   // 5色のうちどれをどの番号に使うか（カラーマップ）
+41 |   const remaining = Array.from({ length: ALL_COLORS }, (_, i) => i);
+42 |   const colorMap: Color[] = [];
+43 |   for (let k = ALL_COLORS; k >= 1; k--) {
+44 |     colorMap.push(remaining.splice(rand(k), 1)[0]);
+45 |   }
+46 | 
 ```
 
 カラーマップを作る。
-- L38: `remaining` は残っている色 `[0, 1, 2, 3, 4]`。`Array.from({ length: 5 }, (_, i) => i)` は「長さ5で、i 番目が i の配列」。
-- L40–42: 5回、残りの中から乱数で1色選んで `colorMap` に入れ、`remaining` から取り除く（`splice(位置, 1)` は1個取り除いて、取り除いた要素の配列を返す）。
-- たとえば `colorMap` が `[3, 2, 1, 0, 4]` なら、表の「0」は黄、「1」は青…と読み替える。4色なら `colorMap` の先頭4色が使われる。
+- L41: `remaining` は残っている色 `[0, 1, 2, 3, 4]`。`Array.from({ length: 5 }, (_, i) => i)` は「長さ5で、i 番目が i の配列」。
+- L43–45: 5回、残りの中から乱数で1色選んで `colorMap` に入れ、`remaining` から取り除く（`splice(位置, 1)` は1個取り除いて、取り除いた要素の配列を返す）。
+- 以下では色を 0〜n-1 の番号で扱い、最後に `colorMap` で本当の色に読み替える。4色なら `colorMap` の先頭4色が使われる。
 
-**L43–56**
+**L47–64**
 
 ```ts
-43 | 
-44 |   const pools = [3, 4, 5].map((n) => {
-45 |     const pool = Array.from({ length: POOL_SIZE }, (_, i) => i % n);
-46 |     for (const len of [16, 32, 64]) {
-47 |       for (let row = 0; row < POOL_SIZE / len - 1; row++) {
-48 |         for (let k = 0; k < len / 2; k++) {
-49 |           const a = row * len + rand(len);
-50 |           const b = (row + 1) * len + rand(len);
-51 |           [pool[a], pool[b]] = [pool[b], pool[a]];
-52 |         }
-53 |       }
-54 |     }
-55 |     return pool;
-56 |   });
+47 |   const size = BLOCK_PAIRS * 2;
+48 |   const base = Math.floor(size / n);
+49 |   const hasExtra = size % n !== 0;
+50 |   const puyos: Color[] = [];
+51 |   for (let block = 0; block < LOOP / BLOCK_PAIRS; block++) {
+52 |     // 1個多くする色。最初の区切りは乱数、以降は順番に替える
+53 |     const extra = block === 0 ? rand(n) : (block - 1) % n;
+54 |     const pool: number[] = [];
+55 |     for (let c = 0; c < n; c++) {
+56 |       const count = base + (hasExtra && c === extra ? 1 : 0);
+57 |       for (let k = 0; k < count; k++) pool.push(c);
+58 |     }
+59 |     do {
+60 |       shuffle(pool, rand);
+61 |     } while (block === 0 && new Set(pool.slice(0, 4)).size !== 3);
+62 |     for (const c of pool) puyos.push(colorMap[c]);
+63 |   }
+64 | 
 ```
 
-3色・4色・5色の表を作って混ぜる。3つの表は同じ乱数を続けて使うので、順番（3色→4色→5色）も本家どおりにしてある。
-- L45: `i % n` で `0, 1, …, n-1, 0, 1, …` と256個並べる。4色なら各色64個ずつ。
-- L46–54: 表を16個ずつ・32個ずつ・64個ずつの区画に分けて、3回混ぜる。
-  - L47: `row` は区画の番号。最後の区画の手前まで。
-  - L48–52: 区画 `row` と次の区画 `row + 1` から1個ずつ乱数で選び、入れ替える。これを区画の大きさの半分の回数くり返す。
-  - L51: `[a, b] = [b, a]` は2つの値を入れ替える書き方（分割代入）。
-- 隣の区画とだけ入れ替えるので、完全にばらばらには混ざらない。これも本家どおり。
+8手（16個）ずつの区切りを16個作る（16 × 8手 = 128手）。
+- L47–49: 1区切りの個数は16。`base` は1色あたりの数（4色なら4、3色なら5、5色なら3）。`hasExtra` は割り切れずに余りが出るか（3色・5色は16を割り切れないので1個余る）。
+- L53: 余りの1個をどの色にするか。最初の区切りは乱数、2つ目からは 0, 1, 2, … と順番に替える。こうすると9〜128手目（15区切り）で、どの色も同じ回数だけ「1個多い」役が回ってくる（3色なら5回ずつ、5色なら3回ずつ）ので、合計がそろう。
+- L54–58: その区切りの16個を、色ごとに決めた数だけ並べる。
+- L59–61: シャッフルする。最初の区切りだけは、先頭4個（最初の2手）にちょうど3色入るまでやり直す（`do { … } while (条件)` は「まず1回やって、条件が成り立つ間くり返す」）。`new Set(配列).size` は配列に何種類の値があるか。
+- L62: カラーマップで本当の色に読み替えて、全体の列 `puyos` に足す。
 
-**L57–61**
+**L65–71**
 
 ```ts
-57 |   for (let i = 0; i < 4; i++) {
-58 |     pools[1][i] = pools[0][i];
-59 |     pools[2][i] = pools[0][i];
-60 |   }
-61 | 
+65 |   const pairs: Pair[] = [];
+66 |   for (let i = 0; i < puyos.length; i += 2) {
+67 |     pairs.push({ axis: puyos[i], child: puyos[i + 1] });
+68 |   }
+69 |   return pairs;
+70 | }
+71 | 
 ```
 
-4色・5色の表の先頭4個（＝最初の2手）を、3色の表の先頭4個で上書きする。だから何色で遊んでも、最初の2手は同じで、必ず3色以内になる。
-`pools[0]` が3色、`pools[1]` が4色、`pools[2]` が5色の表。
+256個を前から2個ずつ取り、1個目を軸ぷよ、2個目を子ぷよにして128手の配列を返す。
 
-**L62–68**
+**L72–79**
 
 ```ts
-62 |   const pool = pools[Math.min(Math.max(colorCount, 3), 5) - 3];
-63 |   const pairs: Pair[] = [];
-64 |   for (let i = 0; i < POOL_SIZE; i += 2) {
-65 |     pairs.push({ axis: colorMap[pool[i]], child: colorMap[pool[i + 1]] });
-66 |   }
-67 |   return pairs;
-68 | }
+72 | /** 配列をその場でシャッフルする（フィッシャー–イェーツ） */
+73 | function shuffle(a: number[], rand: (m: number) => number): void {
+74 |   for (let i = a.length - 1; i > 0; i--) {
+75 |     const j = rand(i + 1);
+76 |     [a[i], a[j]] = [a[j], a[i]];
+77 |   }
+78 | }
+79 | 
 ```
 
-- L62: 色数に合った表を選ぶ。`Math.min(Math.max(colorCount, 3), 5)` で 3〜5 に収めてから3を引くので、0〜2 の番号になる。
-- L64–66: 表を前から2個ずつ取り、カラーマップで本当の色に読み替えて1手にする。1個目を軸ぷよ、2個目を子ぷよにしている。
-- L67: 128手の配列を返す。
+`shuffle` … 配列をその場でシャッフルする。**フィッシャー–イェーツ**という定番の方法で、どの並びも同じ確率になる。
+後ろから順に、「自分より前（自分を含む）の中から乱数で1つ選んで入れ替える」をくり返す。
 
-**L69–73**
+**L80–84**
 
 ```ts
-69 | 
-70 | /** シードをランダムに選ぶ（1〜SEED_COUNT） */
-71 | export function randomSeed(): number {
-72 |   return 1 + Math.floor(Math.random() * CONFIG.SEED_COUNT);
-73 | }
+80 | /** シードをランダムに選ぶ（1〜SEED_COUNT） */
+81 | export function randomSeed(): number {
+82 |   return 1 + Math.floor(Math.random() * CONFIG.SEED_COUNT);
+83 | }
+84 | 
 ```
 
 ランダムなシード番号（1〜65536）を選ぶ。こちらは「毎回違ってほしい」ので `Math.random()` を使う。
@@ -186,24 +195,23 @@
 
 ## ループするツモ列 TsumoSequence
 
-**L74–84**
+**L85–94**
 
 ```ts
-74 | 
-75 | /** ループするツモ列 */
-76 | export class TsumoSequence {
-77 |   private readonly pairs: Pair[];
-78 |   constructor(public readonly seed: number) {
-79 |     this.pairs = generateTsumo(seed);
-80 |   }
-81 |   at(index: number): Pair {
-82 |     return this.pairs[index % this.pairs.length];
-83 |   }
-84 | }
+85 | /** ループするツモ列 */
+86 | export class TsumoSequence {
+87 |   private readonly pairs: Pair[];
+88 |   constructor(public readonly seed: number) {
+89 |     this.pairs = generateTsumo(seed);
+90 |   }
+91 |   at(index: number): Pair {
+92 |     return this.pairs[index % this.pairs.length];
+93 |   }
+94 | }
 ```
 
 生成した128手を持っておき、何手目でも取り出せるようにする**クラス**。
-- L77: `private readonly pairs` … クラスの外から見えない（`private`）、作った後は変えない（`readonly`）プロパティ。
-- L78: `constructor(public readonly seed: number)` … 引数に `public readonly` を付けると、「引数を受け取る」と「同名のプロパティに保存する」を一度に書ける TypeScript の省略記法。`new TsumoSequence(123).seed` で 123 が読める。
-- L79: 作った瞬間に128手を生成しておく。
-- L81–83: `at(index)` で index 手目のペアを返す。`%`（割った余り）を使うので、128手目は0手目に戻る＝**128手ループ**になる。
+- L87: `private readonly pairs` … クラスの外から見えない（`private`）、作った後は変えない（`readonly`）プロパティ。
+- L88: `constructor(public readonly seed: number)` … 引数に `public readonly` を付けると、「引数を受け取る」と「同名のプロパティに保存する」を一度に書ける TypeScript の省略記法。`new TsumoSequence(123).seed` で 123 が読める。
+- L89: 作った瞬間に128手を生成しておく。
+- L91–93: `at(index)` で index 手目のペアを返す。`%`（割った余り）を使うので、128手目は0手目に戻る＝**128手ループ**になる。
