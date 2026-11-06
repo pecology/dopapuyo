@@ -5,11 +5,11 @@ import { gemSprite } from '../render/gems';
 import type { ControlHandlers } from './controls';
 
 /** 段の並び（上から）: 縦（子が上）・縦（子が下）・横（子が右）・横（子が左） */
-const ROWS: { rot: Rotation; name: string }[] = [
-  { rot: 0, name: '縦・子が上' },
-  { rot: 2, name: '縦・子が下' },
-  { rot: 1, name: '横・子が右' },
-  { rot: 3, name: '横・子が左' },
+const ROWS: { rot: Rotation; name: string; dir: string }[] = [
+  { rot: 0, name: '縦・子が上', dir: 'up' },
+  { rot: 2, name: '縦・子が下', dir: 'down' },
+  { rot: 1, name: '横・子が右', dir: 'right' },
+  { rot: 3, name: '横・子が左', dir: 'left' },
 ];
 
 interface PadButton {
@@ -23,9 +23,10 @@ interface PadButton {
 
 /**
  * ボタン方式（タッチ）: 置き方22パターンを1つずつボタンにして、盤面の下に並べる。
+ * ボタンは軸ぷよが落ちる列の真下に置く（横・子が右の6列目と、横・子が左の1列目は置けないので空き）。
  * - ボタンに指を置くと盤面に置き先を表示し、離すと設置
  * - 指を置いたままボタンの外へずらして離すと、置かずに取り消す
- * - 各ボタンには今のペアの色で、置いたときの形を描く
+ * - 各ボタンには今のペアの色で、軸ぷよを中央に、子ぷよを小さくその向きにずらして描く
  */
 export class ButtonPad {
   enabled = false;
@@ -40,25 +41,22 @@ export class ButtonPad {
     private root: HTMLElement,
     private h: ControlHandlers,
   ) {
-    for (const { rot, name } of ROWS) {
+    for (const { rot, name, dir } of ROWS) {
       const row = document.createElement('div');
       row.className = 'pad-row';
-      const vertical = rot === 0 || rot === 2;
-      // 縦置きは各列の真下、横置きは2列の境目の真下に来るよう、半列刻みの格子に置く
-      for (let i = 0; i < (vertical ? COLS : COLS - 1); i++) {
-        const col = rot === 3 ? i + 1 : i;
+      for (let col = 0; col < COLS; col++) {
+        // 子ぷよが盤面の外に出る置き方はない
+        if ((rot === 1 && col === COLS - 1) || (rot === 3 && col === 0)) continue;
         const el = document.createElement('button');
         el.type = 'button';
-        el.className = `pad-btn ${vertical ? 'v' : 'h'}`;
-        el.style.gridColumn = `${vertical ? i * 2 + 1 : i * 2 + 2} / span 2`;
-        el.setAttribute('aria-label', vertical ? `${name} ${i + 1}列目` : `${name} ${i + 1}-${i + 2}列目`);
+        el.className = `pad-btn ${dir}`;
+        el.style.gridColumn = String(col + 1);
+        el.setAttribute('aria-label', `${name} 軸${col + 1}列目`);
         const axis = document.createElement('span');
         const child = document.createElement('span');
         axis.className = 'pad-gem axis';
-        child.className = 'pad-gem';
-        // 置いたときの見た目どおりの順に並べる（上→下、左→右）
-        if (rot === 0 || rot === 3) el.append(child, axis);
-        else el.append(axis, child);
+        child.className = 'pad-gem child';
+        el.append(axis, child);
         row.append(el);
         this.buttons.push({ el, col, rot, axis, child });
       }

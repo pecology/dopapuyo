@@ -659,23 +659,21 @@ input[type='range'] {
   margin: 0 auto;
   padding: 6px 0 8px;
   display: grid;
-  gap: 5px;
+  gap: 3px;
   touch-action: none;
 }
 
-/* 半列刻みの12マス。縦置きは2マス、横置きは境目をまたいで2マス使う */
+/* 盤面と同じ6列。ボタンは軸ぷよが落ちる列に置く */
 .pad-row {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
 }
 
 .pad-btn {
-  height: 44px;
+  position: relative;
+  height: 52px;
   padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border: 1px solid var(--gold-dim);
   border-radius: 9px;
   background: rgba(30, 26, 54, 0.85);
@@ -684,20 +682,39 @@ input[type='range'] {
   -webkit-touch-callout: none;
 }
 
-.pad-btn.v {
-  flex-direction: column;
-}
-
+/* ぷよの絵。軸ぷよはボタンの中央、子ぷよは小さくして向きの方へずらす */
 .pad-gem {
-  width: 18px;
-  height: 18px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
   background: center / contain no-repeat;
+  transform: translate(-50%, -50%);
 }
 
-/* 軸ぷよの目印 */
 .pad-gem.axis {
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
+  /* 軸ぷよの目印 */
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+}
+
+.pad-gem.child {
+  width: 16px;
+  height: 16px;
+}
+
+.pad-btn.up .child {
+  transform: translate(-50%, calc(-50% - 17px));
+}
+.pad-btn.down .child {
+  transform: translate(-50%, calc(-50% + 17px));
+}
+.pad-btn.right .child {
+  transform: translate(calc(-50% + 17px), -50%);
+}
+.pad-btn.left .child {
+  transform: translate(calc(-50% - 17px), -50%);
 }
 
 /* 同じ色のペアで、結果が他のボタンと同じになるもの */

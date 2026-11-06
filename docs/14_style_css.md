@@ -986,121 +986,142 @@ PC のときの見た目の調整。
 659 |   margin: 0 auto;
 660 |   padding: 6px 0 8px;
 661 |   display: grid;
-662 |   gap: 5px;
+662 |   gap: 3px;
 663 |   touch-action: none;
 664 | }
 ```
 
 `.pad` … ボタン方式のボタンを入れる箱。`#app` の `pad` の領域に置く。
 - `max-width: 460px` と `margin: 0 auto` … 横に広い画面でも広がりすぎないようにして、中央に寄せる。
-- `display: grid` と `gap: 5px` … 4段のボタン列を5px間隔で縦に並べる。
+- `display: grid` と `gap: 3px` … 4段のボタン列を3px間隔で縦に並べる。間隔を詰めて、そのぶんボタンを大きくしている。
 - `touch-action: none` … このあたりを触っても、スクロールや拡大をしない。
 
 **L665–671**
 
 ```css
 665 | 
-666 | /* 半列刻みの12マス。縦置きは2マス、横置きは境目をまたいで2マス使う */
+666 | /* 盤面と同じ6列。ボタンは軸ぷよが落ちる列に置く */
 667 | .pad-row {
 668 |   display: grid;
-669 |   grid-template-columns: repeat(12, minmax(0, 1fr));
-670 |   gap: 4px;
+669 |   grid-template-columns: repeat(6, minmax(0, 1fr));
+670 |   gap: 3px;
 671 | }
 ```
 
-`.pad-row` … ボタン1段。横を**12マス**（半列ずつ）に分ける。`repeat(12, minmax(0, 1fr))` は「同じ幅のマスを12個」。
-縦置きのボタンは2マスずつ使うので1列ぶんの幅になり、横置きのボタンは1マスずらして2マス使うので、2列の境目の真下に来る（位置は `pad.ts` が `gridColumn` で決める）。
+`.pad-row` … ボタン1段。盤面と同じく横を6列に分ける。`repeat(6, minmax(0, 1fr))` は「同じ幅の列を6つ」。どの列に置くかは `pad.ts` が `gridColumn` で決める（軸ぷよが落ちる列）。
 
-**L672–686**
+**L672–683**
 
 ```css
 672 | 
 673 | .pad-btn {
-674 |   height: 44px;
-675 |   padding: 0;
-676 |   display: flex;
-677 |   align-items: center;
-678 |   justify-content: center;
-679 |   border: 1px solid var(--gold-dim);
-680 |   border-radius: 9px;
-681 |   background: rgba(30, 26, 54, 0.85);
-682 |   cursor: pointer;
-683 |   touch-action: none;
-684 |   -webkit-touch-callout: none;
-685 | }
-686 | 
+674 |   position: relative;
+675 |   height: 52px;
+676 |   padding: 0;
+677 |   border: 1px solid var(--gold-dim);
+678 |   border-radius: 9px;
+679 |   background: rgba(30, 26, 54, 0.85);
+680 |   cursor: pointer;
+681 |   touch-action: none;
+682 |   -webkit-touch-callout: none;
+683 | }
 ```
 
-`.pad-btn` … ボタン1個。高さ44px（指で押しやすい大きさ）。中に描くぷよ2個を `flex` で中央に並べる。
+`.pad-btn` … ボタン1個。高さ52px（指で押しやすい大きさ）。
+- `position: relative` … 中のぷよの絵を、ボタンを基準にした位置に置けるようにする。
 - `-webkit-touch-callout: none` … iPhone で長押ししたときのメニューを出さない。
 
-**L687–690**
+**L684–692**
 
 ```css
-687 | .pad-btn.v {
-688 |   flex-direction: column;
-689 | }
-690 | 
+684 | 
+685 | /* ぷよの絵。軸ぷよはボタンの中央、子ぷよは小さくして向きの方へずらす */
+686 | .pad-gem {
+687 |   position: absolute;
+688 |   left: 50%;
+689 |   top: 50%;
+690 |   background: center / contain no-repeat;
+691 |   transform: translate(-50%, -50%);
+692 | }
 ```
 
-`.v` は縦置きのボタン。ぷよ2個を縦に並べる（`flex-direction: column`）。
+`.pad-gem` … ボタンの中のぷよ1個。画像（宝石の絵）は `pad.ts` が `backgroundImage` で入れる。
+- `position: absolute` と `left: 50%; top: 50%`、`transform: translate(-50%, -50%)` … ボタンのちょうど中央に置く（左上の角を中央に置いてから、自分の大きさの半分だけ戻す）。
+- `center / contain no-repeat` … 画像を中央に、はみ出さない大きさで、1回だけ描く。
 
-**L691–696**
+**L693–705**
 
 ```css
-691 | .pad-gem {
-692 |   width: 18px;
-693 |   height: 18px;
-694 |   background: center / contain no-repeat;
-695 | }
-696 | 
+693 | 
+694 | .pad-gem.axis {
+695 |   width: 22px;
+696 |   height: 22px;
+697 |   border-radius: 50%;
+698 |   /* 軸ぷよの目印 */
+699 |   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+700 | }
+701 | 
+702 | .pad-gem.child {
+703 |   width: 16px;
+704 |   height: 16px;
+705 | }
 ```
 
-`.pad-gem` … ボタンの中のぷよ1個。画像（宝石の絵）は `pad.ts` が `backgroundImage` で入れる。`center / contain no-repeat` は「中央に、はみ出さない大きさで、1回だけ」。
+- 軸ぷよは22px。白い細い輪を付けて、どちらが軸かを分かるようにする（`box-shadow: 0 0 0 1.5px` はぼかさない影＝外側の線になる）。
+- 子ぷよは16px。軸ぷよより小さくして、区別しやすくする。
 
-**L697–702**
+**L706–718**
 
 ```css
-697 | /* 軸ぷよの目印 */
-698 | .pad-gem.axis {
-699 |   border-radius: 50%;
-700 |   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
-701 | }
-702 | 
+706 | 
+707 | .pad-btn.up .child {
+708 |   transform: translate(-50%, calc(-50% - 17px));
+709 | }
+710 | .pad-btn.down .child {
+711 |   transform: translate(-50%, calc(-50% + 17px));
+712 | }
+713 | .pad-btn.right .child {
+714 |   transform: translate(calc(-50% + 17px), -50%);
+715 | }
+716 | .pad-btn.left .child {
+717 |   transform: translate(calc(-50% - 17px), -50%);
+718 | }
 ```
 
-軸ぷよには白い細い輪を付けて、どちらが軸かを分かるようにする。`box-shadow: 0 0 0 1.5px` はぼかさない影＝外側の線になる。
+子ぷよを、向きに合わせて中央から17pxずらす。`calc(-50% - 17px)` は「中央に置くための -50% から、さらに17px」。
+軸ぷよはどのボタンでも中央なので、子ぷよがどちらにあるかだけを見れば向きが分かる。
 
-**L703–707**
+**L719–723**
 
 ```css
-703 | /* 同じ色のペアで、結果が他のボタンと同じになるもの */
-704 | .pad-btn.dup {
-705 |   opacity: 0.4;
-706 | }
-707 | 
+719 | 
+720 | /* 同じ色のペアで、結果が他のボタンと同じになるもの */
+721 | .pad-btn.dup {
+722 |   opacity: 0.4;
+723 | }
 ```
 
 同じ色のペアのとき、他のボタンと結果が同じになるボタン（子が下・子が左）を薄くする。
 
-**L708–712**
+**L724–728**
 
 ```css
-708 | .pad-btn.active {
-709 |   border-color: var(--gold);
-710 |   background: rgba(214, 190, 140, 0.28);
-711 | }
-712 | 
+724 | 
+725 | .pad-btn.active {
+726 |   border-color: var(--gold);
+727 |   background: rgba(214, 190, 140, 0.28);
+728 | }
 ```
 
 押している間のボタンを金色にする。
 
-**L713–715**
+**L729–732**
 
 ```css
-713 | .pad.disabled .pad-btn:not(.active) {
-714 |   opacity: 0.55;
-715 | }
+729 | 
+730 | .pad.disabled .pad-btn:not(.active) {
+731 |   opacity: 0.55;
+732 | }
 ```
 
 連鎖の演出中など、まだ置けないときはボタンを薄くする（押している最中のボタンは除く）。
